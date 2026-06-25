@@ -321,6 +321,7 @@ function PaymentSection({
           <Input name="name" placeholder="새 결제수단" maxLength={40} required />
           <FormSelect
             name="kind"
+            ariaLabel="결제수단 종류"
             defaultValue="card"
             className="w-24"
             options={[

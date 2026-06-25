@@ -28,6 +28,7 @@ export function FormSelect({
   placeholder,
   emptyLabel,
   className,
+  ariaLabel,
 }: {
   name: string;
   defaultValue?: string;
@@ -35,6 +36,7 @@ export function FormSelect({
   placeholder?: string;
   emptyLabel?: string;
   className?: string;
+  ariaLabel?: string;
 }) {
   const [value, setValue] = React.useState(
     defaultValue || (emptyLabel ? EMPTY : ""),
@@ -44,7 +46,7 @@ export function FormSelect({
     <>
       <input type="hidden" name={name} value={submitted} />
       <Select value={value || undefined} onValueChange={setValue}>
-        <SelectTrigger className={cn("w-full", className)}>
+        <SelectTrigger className={cn("w-full", className)} aria-label={ariaLabel}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>

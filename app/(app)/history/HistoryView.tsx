@@ -217,6 +217,7 @@ function Row({
           <div className="flex gap-2">
             <FormSelect
               name="type"
+              ariaLabel="종류"
               defaultValue={tx.type}
               className="flex-1"
               options={[
@@ -237,12 +238,14 @@ function Row({
           {fe?.name && <p className="text-sm text-destructive">{fe.name}</p>}
           <FormSelect
             name="categoryId"
+            ariaLabel="카테고리"
             defaultValue={tx.categoryId ?? ""}
             emptyLabel="미분류"
             options={categories.map((c) => ({ value: c.id, label: c.name }))}
           />
           <FormSelect
             name="paymentMethodId"
+            ariaLabel="결제수단"
             defaultValue={tx.paymentMethodId ?? ""}
             emptyLabel="없음"
             options={payments.map((p) => ({ value: p.id, label: p.name }))}

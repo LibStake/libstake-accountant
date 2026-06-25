@@ -121,6 +121,7 @@ export function EntryForm({
         <FormSelect
           key={`cat-${resetKey}`}
           name="categoryId"
+          ariaLabel="카테고리"
           emptyLabel="미분류"
           options={categories.map((c) => ({ value: c.id, label: c.name }))}
         />
@@ -131,6 +132,7 @@ export function EntryForm({
         <FormSelect
           key={`pay-${resetKey}`}
           name="paymentMethodId"
+          ariaLabel="결제수단"
           defaultValue={defaultPaymentId ?? ""}
           emptyLabel="없음"
           options={payments.map((p) => ({ value: p.id, label: p.name }))}

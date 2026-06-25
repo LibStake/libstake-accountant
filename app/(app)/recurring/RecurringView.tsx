@@ -350,12 +350,14 @@ function DefForm({
 
       <FormSelect
         name="categoryId"
+        ariaLabel="카테고리"
         defaultValue={initial?.categoryId ?? ""}
         emptyLabel="미분류"
         options={categories.map((c) => ({ value: c.id, label: c.name }))}
       />
       <FormSelect
         name="paymentMethodId"
+        ariaLabel="결제수단"
         defaultValue={initial?.paymentMethodId ?? ""}
         emptyLabel="결제수단 없음"
         options={payments.map((p) => ({ value: p.id, label: p.name }))}
