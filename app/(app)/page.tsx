@@ -1,7 +1,19 @@
-export default function HomePage() {
+import { requireSession } from "@/lib/auth/guard";
+import * as repo from "@/lib/domain/repo";
+import { EntryForm } from "./EntryForm";
+
+export default async function EntryPage() {
+  const { uid } = await requireSession();
+  const [categories, payments, defaultPaymentId] = await Promise.all([
+    repo.listCategories(uid),
+    repo.listPayments(uid),
+    repo.getDefaultPaymentId(uid),
+  ]);
   return (
-    <div className="mx-auto w-full max-w-md px-6 py-12">
-      <p className="text-zinc-500">거래 입력 화면 자리.</p>
-    </div>
+    <EntryForm
+      categories={categories.map((c) => ({ id: c.id, name: c.name }))}
+      payments={payments.map((p) => ({ id: p.id, name: p.name }))}
+      defaultPaymentId={defaultPaymentId}
+    />
   );
 }

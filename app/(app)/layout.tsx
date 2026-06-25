@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { requireSession } from "@/lib/auth/guard";
+import { BottomNav, TopNav } from "./AppNav";
 
 export default async function AppLayout({
   children,
@@ -9,15 +9,9 @@ export default async function AppLayout({
   await requireSession();
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-        <Link href="/" className="font-semibold">
-          가계부
-        </Link>
-        <Link href="/account" className="text-sm text-zinc-500 underline">
-          계정
-        </Link>
-      </header>
-      <main className="flex-1">{children}</main>
+      <TopNav />
+      <main className="flex-1 pb-16 sm:pb-0">{children}</main>
+      <BottomNav />
     </div>
   );
 }

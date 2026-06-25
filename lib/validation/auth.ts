@@ -22,11 +22,4 @@ export const passwordChangeInput = z.object({
 });
 export const passwordResetInput = z.object({ next: newPassword });
 
-export function fieldErrors(error: z.ZodError): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const issue of error.issues) {
-    const key = issue.path[0];
-    if (typeof key === "string" && !(key in out)) out[key] = issue.message;
-  }
-  return out;
-}
+export { fieldErrors } from "./form";

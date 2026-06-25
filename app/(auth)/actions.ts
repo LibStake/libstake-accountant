@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 import { loginInput, signupInput, pinInput, fieldErrors } from "@/lib/validation/auth";
 import * as repo from "@/lib/auth/repo";
+import { seedCategories } from "@/lib/domain/repo";
+import { DEFAULT_CATEGORIES } from "@/lib/domain/defaults";
 import { hashPassword, verifyPassword, verifyPin } from "@/lib/auth/hash";
 import { issueSession } from "@/lib/auth/session";
 import { readDeviceToken, clearDeviceToken } from "@/lib/auth/device";
@@ -23,6 +25,7 @@ export async function signup(_prev: State, formData: FormData): Promise<Result<n
   const user = await repo.createUser(parsed.data.email, await hashPassword(parsed.data.password));
   // 계정 존재 비노출 — 이미 쓰는 이메일이어도 구체 사유를 밝히지 않는다.
   if (!user) return fail("가입을 완료하지 못했어요. 입력을 확인하고 다시 시도해주세요.");
+  await seedCategories(user.uid, DEFAULT_CATEGORIES);
   await issueSession(user.uid, "password");
   redirect("/");
 }
