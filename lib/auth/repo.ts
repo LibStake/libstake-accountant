@@ -128,6 +128,11 @@ export async function getDevice(
   };
 }
 
+// 기기의 빠른 로그인이 아직 유효한지(만료 전).
+export function isDeviceActive(state: DeviceState | null): boolean {
+  return !!state && state.expiresAt.getTime() >= Date.now();
+}
+
 export async function incrementDeviceFail(
   uid: string,
   deviceId: string,

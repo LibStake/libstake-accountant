@@ -10,7 +10,7 @@ export default async function LoginPage() {
   let hasFastLogin = false;
   if (device) {
     const state = await repo.getDevice(device.uid, device.deviceId);
-    hasFastLogin = !!state && state.expiresAt.getTime() >= Date.now();
+    hasFastLogin = repo.isDeviceActive(state);
   }
   return <LoginForms hasFastLogin={hasFastLogin} />;
 }

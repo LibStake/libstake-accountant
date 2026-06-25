@@ -9,7 +9,7 @@ export default async function AccountPage() {
   let hasPin = false;
   if (device && device.uid === session.uid) {
     const state = await repo.getDevice(device.uid, device.deviceId);
-    hasPin = !!state && state.expiresAt.getTime() >= Date.now();
+    hasPin = repo.isDeviceActive(state);
   }
   const devices = await repo.listDevices(session.uid);
   const email = (await repo.getEmail(session.uid)) ?? "";
