@@ -2,8 +2,16 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { REGEXP_ONLY_DIGITS } from "input-otp";
 import { login, pinUnlock } from "../actions";
-import { ui } from "@/lib/ui";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
 import { PIN_LENGTH } from "@/lib/auth/constants";
 
 export function LoginForms({ hasFastLogin }: { hasFastLogin: boolean }) {
@@ -16,7 +24,7 @@ export function LoginForms({ hasFastLogin }: { hasFastLogin: boolean }) {
           <PinUnlock />
           <button
             type="button"
-            className="text-sm text-zinc-500 underline"
+            className="mx-auto text-sm text-muted-foreground underline"
             onClick={() => setMode("full")}
           >
             일반 로그인으로
@@ -25,7 +33,7 @@ export function LoginForms({ hasFastLogin }: { hasFastLogin: boolean }) {
       ) : (
         <div className="flex flex-col gap-6">
           <FullLogin />
-          <div className="flex justify-between text-sm text-zinc-500">
+          <div className="flex justify-between text-sm text-muted-foreground">
             {hasFastLogin && (
               <button type="button" className="underline" onClick={() => setMode("pin")}>
                 PIN으로
@@ -44,97 +52,74 @@ export function LoginForms({ hasFastLogin }: { hasFastLogin: boolean }) {
 function FullLogin() {
   const [state, action, pending] = useActionState(login, null);
   return (
-    <form action={action} className="flex flex-col gap-3">
-      <label className={ui.label}>
-        이메일
-        <input className={ui.input} type="email" name="email" autoComplete="username" required />
-      </label>
-      <label className={ui.label}>
-        비밀번호
-        <input
-          className={ui.input}
+    <form action={action} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="email">이메일</Label>
+        <Input id="email" type="email" name="email" autoComplete="username" required />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="password">비밀번호</Label>
+        <Input
+          id="password"
           type="password"
           name="password"
           autoComplete="current-password"
           required
         />
-      </label>
+      </div>
       {state && !state.ok && (
-        <p role="alert" className={ui.alert}>
+        <p role="alert" className="text-sm text-destructive">
           {state.error}
         </p>
       )}
-      <button className={ui.button} disabled={pending}>
+      <Button type="submit" size="lg" className="w-full" disabled={pending}>
         {pending ? "확인 중…" : "로그인"}
-      </button>
+      </Button>
     </form>
   );
 }
 
 function PinUnlock() {
-  const [state, action, pending] = useActionState(pinUnlock, null);
   const [pin, setPin] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
+  // 실패 시 입력을 비워 다시 시도하게 한다.
+  const [state, action, pending] = useActionState(
+    async (prev: Parameters<typeof pinUnlock>[0], formData: FormData) => {
+      const r = await pinUnlock(prev, formData);
+      if (!r.ok) setPin("");
+      return r;
+    },
+    null,
+  );
 
   useEffect(() => {
     if (pin.length === PIN_LENGTH) formRef.current?.requestSubmit();
   }, [pin]);
-  useEffect(() => {
-    if (state && !state.ok) setPin("");
-  }, [state]);
-
-  const push = (d: string) => setPin((p) => (p.length < PIN_LENGTH ? p + d : p));
-  const back = () => setPin((p) => p.slice(0, -1));
 
   return (
     <form action={action} ref={formRef} className="flex flex-col items-center gap-6">
       <input type="hidden" name="pin" value={pin} />
-      <div className="flex gap-3" role="status" aria-label={`PIN ${pin.length}자리 입력됨`}>
-        {Array.from({ length: PIN_LENGTH }).map((_, i) => (
-          <span
-            key={i}
-            className={`h-3 w-3 rounded-full ${
-              i < pin.length ? "bg-zinc-900 dark:bg-zinc-100" : "bg-zinc-300 dark:bg-zinc-700"
-            }`}
-          />
-        ))}
-      </div>
+      <InputOTP
+        maxLength={PIN_LENGTH}
+        value={pin}
+        onChange={setPin}
+        pattern={REGEXP_ONLY_DIGITS}
+        disabled={pending}
+        autoFocus
+        containerClassName="justify-center"
+        aria-label="PIN"
+      >
+        <InputOTPGroup>
+          {Array.from({ length: PIN_LENGTH }).map((_, i) => (
+            <InputOTPSlot key={i} index={i} className="size-12 text-lg" />
+          ))}
+        </InputOTPGroup>
+      </InputOTP>
       {state && !state.ok && (
-        <p role="alert" className={ui.alert}>
+        <p role="alert" className="text-sm text-destructive">
           {state.error}
         </p>
       )}
-      <div className="grid w-full max-w-xs grid-cols-3 gap-3">
-        {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
-          <button
-            key={d}
-            type="button"
-            onClick={() => push(d)}
-            disabled={pending}
-            className="rounded-lg bg-zinc-100 py-4 text-xl disabled:opacity-50 dark:bg-zinc-800"
-          >
-            {d}
-          </button>
-        ))}
-        <span />
-        <button
-          type="button"
-          onClick={() => push("0")}
-          disabled={pending}
-          className="rounded-lg bg-zinc-100 py-4 text-xl disabled:opacity-50 dark:bg-zinc-800"
-        >
-          0
-        </button>
-        <button
-          type="button"
-          onClick={back}
-          disabled={pending}
-          aria-label="지우기"
-          className="rounded-lg bg-zinc-100 py-4 text-xl disabled:opacity-50 dark:bg-zinc-800"
-        >
-          ⌫
-        </button>
-      </div>
     </form>
   );
 }

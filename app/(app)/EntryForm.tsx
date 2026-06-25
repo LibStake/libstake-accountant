@@ -1,8 +1,16 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { ui } from "@/lib/ui";
+import { toast } from "sonner";
 import { toKstInputValue } from "@/lib/kst";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/components/ui/toggle-group";
+import { FormSelect } from "@/components/form/FormSelect";
 import { createTransaction } from "./actions";
 
 type Opt = { id: string; name: string };
@@ -16,57 +24,75 @@ export function EntryForm({
   payments: Opt[];
   defaultPaymentId: string | null;
 }) {
-  const [state, action, pending] = useActionState(createTransaction, null);
   const [type, setType] = useState<"expense" | "income">("expense");
   const [amount, setAmount] = useState("");
   const [name, setName] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [paymentMethodId, setPaymentMethodId] = useState(defaultPaymentId ?? "");
   const [memo, setMemo] = useState("");
   const [occurredAt, setOccurredAt] = useState("");
-  const [toast, setToast] = useState(false);
+  const [resetKey, setResetKey] = useState(0);
   const amountRef = useRef<HTMLInputElement>(null);
+
+  // 저장 성공 시 폼을 비우고 다음 입력에 대비한다. 셀렉트는 resetKey 리마운트로 초기화.
+  const [state, action, pending] = useActionState(
+    async (prev: Parameters<typeof createTransaction>[0], formData: FormData) => {
+      const r = await createTransaction(prev, formData);
+      if (r.ok) {
+        setAmount("");
+        setName("");
+        setMemo("");
+        setType("expense");
+        setOccurredAt(toKstInputValue(new Date()));
+        setResetKey((k) => k + 1);
+        amountRef.current?.focus();
+        toast.success("저장했어요");
+      }
+      return r;
+    },
+    null,
+  );
 
   // 발생일시 기본값 = 현재(KST). 마운트 후 채워 하이드레이션 불일치를 피한다.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 하이드레이션 안전을 위해 마운트 후 1회만 설정
     setOccurredAt(toKstInputValue(new Date()));
   }, []);
-
-  // 저장 성공 시 폼을 즉시 비워 다음 입력에 대비한다.
-  useEffect(() => {
-    if (!state?.ok) return;
-    setAmount("");
-    setName("");
-    setCategoryId("");
-    setMemo("");
-    setPaymentMethodId(defaultPaymentId ?? "");
-    setType("expense");
-    setOccurredAt(toKstInputValue(new Date()));
-    setToast(true);
-    amountRef.current?.focus();
-    const t = setTimeout(() => setToast(false), 2000);
-    return () => clearTimeout(t);
-  }, [state, defaultPaymentId]);
 
   const fieldErr = state && !state.ok ? state.fields : undefined;
 
   return (
     <form action={action} className="mx-auto flex w-full max-w-md flex-col gap-4 px-6 py-8">
-      <div className="flex gap-2" role="group" aria-label="종류">
-        <SegBtn active={type === "expense"} onClick={() => setType("expense")}>
+      <ToggleGroup
+        type="single"
+        value={type}
+        onValueChange={(v) => v && setType(v as "expense" | "income")}
+        variant="outline"
+        spacing={0}
+        className="w-full"
+        aria-label="종류"
+      >
+        <ToggleGroupItem
+          value="expense"
+          className="flex-1 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+        >
           지출
-        </SegBtn>
-        <SegBtn active={type === "income"} onClick={() => setType("income")}>
+        </ToggleGroupItem>
+        <ToggleGroupItem
+          value="income"
+          className="flex-1 data-[state=on]:bg-emerald-600 data-[state=on]:text-white"
+        >
           수입
-        </SegBtn>
-      </div>
+        </ToggleGroupItem>
+      </ToggleGroup>
       <input type="hidden" name="type" value={type} />
 
-      <label className="flex flex-col gap-1">
-        <span className="text-sm text-zinc-500">금액</span>
-        <input
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="amount" className="text-muted-foreground">
+          금액
+        </Label>
+        <Input
           ref={amountRef}
-          className="w-full rounded-lg border border-zinc-300 bg-transparent px-3 py-3 text-3xl font-semibold tabular-nums outline-none focus:border-zinc-900 dark:border-zinc-700 dark:focus:border-zinc-100"
+          id="amount"
+          className="h-auto py-3 text-3xl font-semibold tabular-nums md:text-3xl"
           name="amount"
           inputMode="numeric"
           pattern="[0-9]*"
@@ -75,117 +101,73 @@ export function EntryForm({
           onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))}
           required
         />
-      </label>
-      {fieldErr?.amount && <p className={ui.alert}>{fieldErr.amount}</p>}
+        {fieldErr?.amount && <p className="text-sm text-destructive">{fieldErr.amount}</p>}
+      </div>
 
-      <label className={ui.label}>
-        지출명
-        <input
-          className={ui.input}
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="name">지출명</Label>
+        <Input
+          id="name"
           name="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           maxLength={100}
           required
         />
-      </label>
-      {fieldErr?.name && <p className={ui.alert}>{fieldErr.name}</p>}
+        {fieldErr?.name && <p className="text-sm text-destructive">{fieldErr.name}</p>}
+      </div>
 
-      <label className={ui.label}>
-        카테고리
-        <select
-          className={ui.input}
+      <div className="flex flex-col gap-1.5">
+        <Label>카테고리</Label>
+        <FormSelect
+          key={`cat-${resetKey}`}
           name="categoryId"
-          value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-        >
-          <option value="">미분류</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      </label>
+          emptyLabel="미분류"
+          options={categories.map((c) => ({ value: c.id, label: c.name }))}
+        />
+      </div>
 
-      <label className={ui.label}>
-        결제수단
-        <select
-          className={ui.input}
+      <div className="flex flex-col gap-1.5">
+        <Label>결제수단</Label>
+        <FormSelect
+          key={`pay-${resetKey}`}
           name="paymentMethodId"
-          value={paymentMethodId}
-          onChange={(e) => setPaymentMethodId(e.target.value)}
-        >
-          <option value="">없음</option>
-          {payments.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-      </label>
+          defaultValue={defaultPaymentId ?? ""}
+          emptyLabel="없음"
+          options={payments.map((p) => ({ value: p.id, label: p.name }))}
+        />
+      </div>
 
-      <label className={ui.label}>
-        발생일시
-        <input
-          className={ui.input}
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="occurredAt">발생일시</Label>
+        <Input
+          id="occurredAt"
           type="datetime-local"
           name="occurredAt"
           value={occurredAt}
           onChange={(e) => setOccurredAt(e.target.value)}
           required
         />
-      </label>
+      </div>
 
-      <label className={ui.label}>
-        메모 (선택)
-        <input
-          className={ui.input}
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="memo">메모 (선택)</Label>
+        <Input
+          id="memo"
           name="memo"
           value={memo}
           onChange={(e) => setMemo(e.target.value)}
           maxLength={500}
         />
-      </label>
+      </div>
 
-      {state && !state.ok && !state.fields && <p className={ui.alert}>{state.error}</p>}
-
-      <button className={ui.button} disabled={pending}>
-        {pending ? "저장 중…" : "저장"}
-      </button>
-
-      {toast && (
-        <p
-          role="status"
-          className="fixed inset-x-0 bottom-20 mx-auto w-fit rounded-full bg-zinc-900 px-4 py-2 text-sm text-white dark:bg-zinc-100 dark:text-zinc-900"
-        >
-          저장했어요
-        </p>
+      {state && !state.ok && !state.fields && (
+        <p className="text-sm text-destructive">{state.error}</p>
       )}
-    </form>
-  );
-}
 
-function SegBtn({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex-1 rounded-lg py-2 text-sm font-medium ${
-        active
-          ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-          : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800"
-      }`}
-    >
-      {children}
-    </button>
+      <Button type="submit" size="lg" className="w-full" disabled={pending}>
+        {pending ? "저장 중…" : "저장"}
+      </Button>
+    </form>
   );
 }

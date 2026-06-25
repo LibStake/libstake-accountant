@@ -2,6 +2,14 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/components/ui/toggle-group";
 
 type Row = { name: string; expense: number; income: number };
 
@@ -31,55 +39,75 @@ export function SummaryView({
   );
   const max = sorted.length ? sorted[0][type] : 0;
   const net = totalIncome - totalExpense;
+  const fill = type === "income" ? "bg-emerald-600" : "bg-primary";
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-6 py-8">
       <div className="flex items-center justify-between">
-        <Link href={`/summary?m=${prevKey}`} className="px-3 py-1 text-zinc-500" aria-label="이전 달">
-          ←
-        </Link>
+        <Button asChild variant="ghost" size="icon" aria-label="이전 달">
+          <Link href={`/summary?m=${prevKey}`}>
+            <ChevronLeft />
+          </Link>
+        </Button>
         <h1 className="font-semibold">{monthLabel}</h1>
-        <Link href={`/summary?m=${nextKey}`} className="px-3 py-1 text-zinc-500" aria-label="다음 달">
-          →
-        </Link>
+        <Button asChild variant="ghost" size="icon" aria-label="다음 달">
+          <Link href={`/summary?m=${nextKey}`}>
+            <ChevronRight />
+          </Link>
+        </Button>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-          <p className="text-xs text-zinc-500">총지출</p>
-          <p className="text-lg font-semibold tabular-nums">{won(totalExpense)}</p>
-        </div>
-        <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-          <p className="text-xs text-zinc-500">총수입</p>
-          <p className="text-lg font-semibold tabular-nums text-emerald-600">
-            {won(totalIncome)}
-          </p>
-        </div>
+        <Card size="sm">
+          <CardContent className="flex flex-col gap-1">
+            <p className="text-xs text-muted-foreground">총지출</p>
+            <p className="text-lg font-semibold tabular-nums">{won(totalExpense)}</p>
+          </CardContent>
+        </Card>
+        <Card size="sm">
+          <CardContent className="flex flex-col gap-1">
+            <p className="text-xs text-muted-foreground">총수입</p>
+            <p className="text-lg font-semibold tabular-nums text-emerald-600">
+              {won(totalIncome)}
+            </p>
+          </CardContent>
+        </Card>
       </div>
-      <p className="text-sm text-zinc-500">
+      <p className="text-sm text-muted-foreground">
         순{" "}
         <span
-          className={`font-medium tabular-nums ${
-            net < 0 ? "text-zinc-900 dark:text-zinc-100" : "text-emerald-600"
-          }`}
+          className={`font-medium tabular-nums ${net < 0 ? "text-foreground" : "text-emerald-600"}`}
         >
           {won(net)}
         </span>
       </p>
 
-      <div className="flex gap-2">
-        <SegBtn active={type === "expense"} onClick={() => setType("expense")}>
+      <ToggleGroup
+        type="single"
+        value={type}
+        onValueChange={(v) => v && setType(v as "expense" | "income")}
+        variant="outline"
+        spacing={0}
+        className="w-full"
+      >
+        <ToggleGroupItem
+          value="expense"
+          className="flex-1 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+        >
           지출
-        </SegBtn>
-        <SegBtn active={type === "income"} onClick={() => setType("income")}>
+        </ToggleGroupItem>
+        <ToggleGroupItem
+          value="income"
+          className="flex-1 data-[state=on]:bg-emerald-600 data-[state=on]:text-white"
+        >
           수입
-        </SegBtn>
-      </div>
+        </ToggleGroupItem>
+      </ToggleGroup>
 
       {!hasData ? (
-        <p className="py-12 text-center text-sm text-zinc-500">이 달엔 거래가 없어요.</p>
+        <p className="py-12 text-center text-sm text-muted-foreground">이 달엔 거래가 없어요.</p>
       ) : sorted.length === 0 ? (
-        <p className="py-8 text-center text-sm text-zinc-500">
+        <p className="py-8 text-center text-sm text-muted-foreground">
           {type === "expense" ? "지출" : "수입"}이 없어요.
         </p>
       ) : (
@@ -90,9 +118,9 @@ export function SummaryView({
                 <span className="min-w-0 truncate">{r.name}</span>
                 <span className="shrink-0 tabular-nums">{won(r[type])}</span>
               </div>
-              <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800">
+              <div className="h-2 overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-2 rounded-full bg-zinc-900 dark:bg-zinc-100"
+                  className={`h-2 rounded-full transition-[width] duration-500 ${fill}`}
                   style={{ width: `${max ? (r[type] / max) * 100 : 0}%` }}
                 />
               </div>
@@ -101,44 +129,15 @@ export function SummaryView({
         </ul>
       )}
 
-      <nav className="flex flex-col gap-2 border-t border-zinc-200 pt-6 dark:border-zinc-800">
-        <Link
-          href="/settings"
-          className="rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-800"
-        >
-          관리 (카테고리 · 결제수단)
-        </Link>
-        <Link
-          href="/account"
-          className="rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-800"
-        >
-          계정 · 보안
-        </Link>
+      <Separator />
+      <nav className="flex flex-col gap-2">
+        <Button asChild variant="outline" className="h-auto w-full justify-start py-3">
+          <Link href="/settings">관리 (카테고리 · 결제수단)</Link>
+        </Button>
+        <Button asChild variant="outline" className="h-auto w-full justify-start py-3">
+          <Link href="/account">계정 · 보안</Link>
+        </Button>
       </nav>
     </div>
-  );
-}
-
-function SegBtn({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex-1 rounded-lg py-2 text-sm font-medium ${
-        active
-          ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-          : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800"
-      }`}
-    >
-      {children}
-    </button>
   );
 }

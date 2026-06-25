@@ -1,10 +1,36 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
-import { ui } from "@/lib/ui";
+import { useActionState, useEffect, useOptimistic, useState } from "react";
+import { toast } from "sonner";
 import { formatKst } from "@/lib/kst";
 import type { Freq, RecurMode, RecurringDef, TxType } from "@/lib/domain/types";
 import type { Result } from "@/lib/server/result";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/components/ui/toggle-group";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { FormSelect } from "@/components/form/FormSelect";
 import {
   approveOccurrence,
   createRecurring,
@@ -16,6 +42,7 @@ import {
 type Opt = { id: string; name: string };
 type Pending = { id: string; name: string; amount: number; type: TxType; occurredAt: string };
 type FormAction = (prev: Result<null> | null, fd: FormData) => Promise<Result<null>>;
+type Picks = { value: string; label: string }[];
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -27,6 +54,33 @@ function describe(d: RecurringDef): string {
   if (d.freq === "weekly") return `매주 ${WEEKDAYS[d.weekday]} ${t}`;
   if (d.freq === "monthly") return `매월 ${d.day}일 ${t}`;
   return `매년 ${d.month}월 ${d.day}일 ${t}`;
+}
+
+function Picker({
+  value,
+  onChange,
+  options,
+  ariaLabel,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: Picks;
+  ariaLabel?: string;
+}) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className="w-full" aria-label={ariaLabel}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((o) => (
+          <SelectItem key={o.value} value={o.value}>
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
 }
 
 export function RecurringView({
@@ -41,18 +95,42 @@ export function RecurringView({
   payments: Opt[];
 }) {
   const [adding, setAdding] = useState(false);
+
+  const [optimisticPending, removePending] = useOptimistic(
+    pending,
+    (state, id: string) => state.filter((o) => o.id !== id),
+  );
+  const [optimisticDefs, removeDef] = useOptimistic(
+    defs,
+    (state, id: string) => state.filter((d) => d.id !== id),
+  );
+
+  async function onApprove(formData: FormData) {
+    removePending(String(formData.get("occId") ?? ""));
+    await approveOccurrence(formData);
+    toast.success("승인했어요");
+  }
+  async function onSkip(formData: FormData) {
+    removePending(String(formData.get("occId") ?? ""));
+    await skipOccurrence(formData);
+  }
+  async function onDeleteDef(formData: FormData) {
+    removeDef(String(formData.get("id") ?? ""));
+    await deleteRecurring(formData);
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-8 px-6 py-8">
       <h1 className="text-xl font-semibold">정기 거래</h1>
 
-      {pending.length > 0 && (
+      {optimisticPending.length > 0 && (
         <section className="flex flex-col gap-3">
           <h2 className="font-medium">대기 회차</h2>
           <ul className="flex flex-col gap-2">
-            {pending.map((o) => (
+            {optimisticPending.map((o) => (
               <li
                 key={o.id}
-                className="flex items-center justify-between gap-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800"
+                className="flex items-center justify-between gap-2 rounded-lg border p-3"
               >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">
@@ -62,16 +140,20 @@ export function RecurringView({
                       {won(o.amount)}
                     </span>
                   </p>
-                  <p className="text-xs text-zinc-500">{formatKst(new Date(o.occurredAt))}</p>
+                  <p className="text-xs text-muted-foreground">{formatKst(new Date(o.occurredAt))}</p>
                 </div>
-                <div className="flex shrink-0 gap-2 text-sm">
-                  <form action={approveOccurrence}>
+                <div className="flex shrink-0 gap-1">
+                  <form action={onApprove}>
                     <input type="hidden" name="occId" value={o.id} />
-                    <button className="text-emerald-600 underline">승인</button>
+                    <Button type="submit" variant="ghost" size="xs" className="text-emerald-600">
+                      승인
+                    </Button>
                   </form>
-                  <form action={skipOccurrence}>
+                  <form action={onSkip}>
                     <input type="hidden" name="occId" value={o.id} />
-                    <button className="text-zinc-500 underline">해제</button>
+                    <Button type="submit" variant="ghost" size="xs" className="text-muted-foreground">
+                      해제
+                    </Button>
                   </form>
                 </div>
               </li>
@@ -82,12 +164,18 @@ export function RecurringView({
 
       <section className="flex flex-col gap-3">
         <h2 className="font-medium">등록된 정기 거래</h2>
-        {defs.length === 0 ? (
-          <p className="text-sm text-zinc-500">등록된 정기 거래가 없어요.</p>
+        {optimisticDefs.length === 0 ? (
+          <p className="text-sm text-muted-foreground">등록된 정기 거래가 없어요.</p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {defs.map((d) => (
-              <DefRow key={d.id} def={d} categories={categories} payments={payments} />
+            {optimisticDefs.map((d) => (
+              <DefRow
+                key={d.id}
+                def={d}
+                categories={categories}
+                payments={payments}
+                onDelete={onDeleteDef}
+              />
             ))}
           </ul>
         )}
@@ -99,9 +187,9 @@ export function RecurringView({
             onDone={() => setAdding(false)}
           />
         ) : (
-          <button className={ui.ghost} onClick={() => setAdding(true)}>
+          <Button variant="outline" onClick={() => setAdding(true)}>
             정기 거래 추가
-          </button>
+          </Button>
         )}
       </section>
     </div>
@@ -112,17 +200,18 @@ function DefRow({
   def,
   categories,
   payments,
+  onDelete,
 }: {
   def: RecurringDef;
   categories: Opt[];
   payments: Opt[];
+  onDelete: (formData: FormData) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
-  const [confirming, setConfirming] = useState(false);
 
   if (editing) {
     return (
-      <li className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+      <li>
         <DefForm
           action={updateRecurring}
           categories={categories}
@@ -135,7 +224,7 @@ function DefRow({
   }
 
   return (
-    <li className="flex flex-col gap-1 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+    <li className="flex flex-col gap-1 rounded-lg border p-3">
       <div className="flex items-baseline justify-between gap-2">
         <span className="min-w-0 truncate font-medium">{def.name}</span>
         <span className={`shrink-0 tabular-nums ${def.type === "income" ? "text-emerald-600" : ""}`}>
@@ -143,36 +232,40 @@ function DefRow({
           {won(def.amount)}
         </span>
       </div>
-      <div className="flex items-center justify-between gap-2 text-xs text-zinc-500">
+      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
         <span className="truncate">
           {describe(def)} · {def.mode === "auto" ? "자동 추가" : "알림 승인"}
         </span>
-        <span className="flex shrink-0 gap-2">
-          <button type="button" className="underline" onClick={() => setEditing(true)}>
+        <span className="flex shrink-0 gap-1">
+          <Button type="button" variant="ghost" size="xs" onClick={() => setEditing(true)}>
             수정
-          </button>
-          <button
-            type="button"
-            className="text-red-600 underline"
-            onClick={() => setConfirming(true)}
-          >
-            삭제
-          </button>
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button type="button" variant="ghost" size="xs" className="text-destructive">
+                삭제
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>삭제할까요?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  삭제하면 대기 회차도 사라져요(생성된 거래는 보존).
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>취소</AlertDialogCancel>
+                <form action={onDelete}>
+                  <input type="hidden" name="id" value={def.id} />
+                  <AlertDialogAction type="submit" variant="destructive" className="w-full">
+                    삭제
+                  </AlertDialogAction>
+                </form>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </span>
       </div>
-      {confirming && (
-        <form
-          action={deleteRecurring}
-          className="mt-1 flex items-center gap-2 rounded-lg bg-red-50 p-2 text-sm dark:bg-red-950/30"
-        >
-          <input type="hidden" name="id" value={def.id} />
-          <span>삭제하면 대기 회차도 사라져요(생성된 거래는 보존).</span>
-          <button className={ui.danger}>삭제</button>
-          <button type="button" className={ui.ghost} onClick={() => setConfirming(false)}>
-            취소
-          </button>
-        </form>
-      )}
     </li>
   );
 }
@@ -197,205 +290,184 @@ function DefForm({
   const [month, setMonth] = useState(String(initial?.month ?? 1));
   const [day, setDay] = useState(String(initial?.day ?? 1));
   const [weekday, setWeekday] = useState(String(initial?.weekday ?? 1));
+  const [expiry, setExpiry] = useState<string>(initial?.expiry ?? "skip");
 
   useEffect(() => {
-    if (state?.ok) onDone();
-  }, [state, onDone]);
+    if (state?.ok) {
+      onDone();
+      toast.success(initial ? "저장했어요" : "추가했어요");
+    }
+  }, [state, onDone, initial]);
 
   const fe = state && !state.ok ? state.fields : undefined;
 
   return (
-    <form action={formAction} className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+    <form
+      action={formAction}
+      className="flex flex-col gap-3 rounded-lg border p-3 duration-200 animate-in fade-in-0 slide-in-from-top-1"
+    >
       {initial && <input type="hidden" name="id" value={initial.id} />}
-
-      <div className="flex gap-2">
-        <SegBtn active={type === "expense"} onClick={() => setType("expense")}>
-          지출
-        </SegBtn>
-        <SegBtn active={type === "income"} onClick={() => setType("income")}>
-          수입
-        </SegBtn>
-      </div>
       <input type="hidden" name="type" value={type} />
+      <input type="hidden" name="freq" value={freq} />
+      <input type="hidden" name="month" value={month} />
+      <input type="hidden" name="day" value={day} />
+      <input type="hidden" name="weekday" value={weekday} />
+      <input type="hidden" name="mode" value={mode} />
+      <input type="hidden" name="expiry" value={mode === "notify" ? expiry : "skip"} />
 
-      <input
-        className={ui.input}
+      <ToggleGroup
+        type="single"
+        value={type}
+        onValueChange={(v) => v && setType(v as TxType)}
+        variant="outline"
+        spacing={0}
+        className="w-full"
+      >
+        <ToggleGroupItem
+          value="expense"
+          className="flex-1 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+        >
+          지출
+        </ToggleGroupItem>
+        <ToggleGroupItem
+          value="income"
+          className="flex-1 data-[state=on]:bg-emerald-600 data-[state=on]:text-white"
+        >
+          수입
+        </ToggleGroupItem>
+      </ToggleGroup>
+
+      <Input
         name="amount"
         inputMode="numeric"
         defaultValue={initial ? String(initial.amount) : ""}
         placeholder="금액"
         required
       />
-      {fe?.amount && <p className={ui.alert}>{fe.amount}</p>}
-      <input
-        className={ui.input}
-        name="name"
-        defaultValue={initial?.name ?? ""}
-        placeholder="등록명"
-        maxLength={100}
-        required
-      />
-      {fe?.name && <p className={ui.alert}>{fe.name}</p>}
+      {fe?.amount && <p className="text-sm text-destructive">{fe.amount}</p>}
+      <Input name="name" defaultValue={initial?.name ?? ""} placeholder="등록명" maxLength={100} required />
+      {fe?.name && <p className="text-sm text-destructive">{fe.name}</p>}
 
-      <select className={ui.input} name="categoryId" defaultValue={initial?.categoryId ?? ""}>
-        <option value="">미분류</option>
-        {categories.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-      </select>
-      <select
-        className={ui.input}
+      <FormSelect
+        name="categoryId"
+        defaultValue={initial?.categoryId ?? ""}
+        emptyLabel="미분류"
+        options={categories.map((c) => ({ value: c.id, label: c.name }))}
+      />
+      <FormSelect
         name="paymentMethodId"
         defaultValue={initial?.paymentMethodId ?? ""}
-      >
-        <option value="">결제수단 없음</option>
-        {payments.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
+        emptyLabel="결제수단 없음"
+        options={payments.map((p) => ({ value: p.id, label: p.name }))}
+      />
 
-      <select
-        className={ui.input}
-        name="freq"
+      <Picker
         value={freq}
-        onChange={(e) => setFreq(e.target.value as Freq)}
-      >
-        <option value="daily">매일</option>
-        <option value="weekly">매주</option>
-        <option value="monthly">매월</option>
-        <option value="yearly">매년</option>
-      </select>
+        onChange={(v) => setFreq(v as Freq)}
+        ariaLabel="주기"
+        options={[
+          { value: "daily", label: "매일" },
+          { value: "weekly", label: "매주" },
+          { value: "monthly", label: "매월" },
+          { value: "yearly", label: "매년" },
+        ]}
+      />
 
-      {freq === "yearly" ? (
-        <label className={ui.label}>
-          월
-          <select className={ui.input} name="month" value={month} onChange={(e) => setMonth(e.target.value)}>
-            {Array.from({ length: 12 }, (_, i) => (
-              <option key={i + 1} value={i + 1}>
-                {i + 1}월
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : (
-        <input type="hidden" name="month" value={month} />
+      {freq === "yearly" && (
+        <div className="flex flex-col gap-1.5">
+          <Label>월</Label>
+          <Picker
+            value={month}
+            onChange={setMonth}
+            ariaLabel="월"
+            options={Array.from({ length: 12 }, (_, i) => ({
+              value: String(i + 1),
+              label: `${i + 1}월`,
+            }))}
+          />
+        </div>
       )}
-
-      {freq === "yearly" || freq === "monthly" ? (
-        <label className={ui.label}>
-          일
-          <input
-            className={ui.input}
+      {(freq === "yearly" || freq === "monthly") && (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="day-input">일</Label>
+          <Input
+            id="day-input"
             type="number"
             min={1}
             max={31}
-            name="day"
             value={day}
             onChange={(e) => setDay(e.target.value)}
           />
-        </label>
-      ) : (
-        <input type="hidden" name="day" value={day} />
+        </div>
       )}
-
-      {freq === "weekly" ? (
-        <label className={ui.label}>
-          요일
-          <select
-            className={ui.input}
-            name="weekday"
+      {freq === "weekly" && (
+        <div className="flex flex-col gap-1.5">
+          <Label>요일</Label>
+          <Picker
             value={weekday}
-            onChange={(e) => setWeekday(e.target.value)}
-          >
-            {WEEKDAYS.map((w, i) => (
-              <option key={i} value={i}>
-                {w}
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : (
-        <input type="hidden" name="weekday" value={weekday} />
+            onChange={setWeekday}
+            ariaLabel="요일"
+            options={WEEKDAYS.map((w, i) => ({ value: String(i), label: w }))}
+          />
+        </div>
       )}
 
-      <label className={ui.label}>
-        시각
-        <input
-          className={ui.input}
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="time-input">시각</Label>
+        <Input
+          id="time-input"
           type="time"
           name="time"
           defaultValue={initial ? `${pad(initial.hour)}:${pad(initial.minute)}` : "09:00"}
           required
         />
-      </label>
+      </div>
 
-      <select
-        className={ui.input}
-        name="mode"
+      <Picker
         value={mode}
-        onChange={(e) => setMode(e.target.value as RecurMode)}
-      >
-        <option value="notify">알림 승인</option>
-        <option value="auto">자동 추가</option>
-      </select>
+        onChange={(v) => setMode(v as RecurMode)}
+        ariaLabel="모드"
+        options={[
+          { value: "notify", label: "알림 승인" },
+          { value: "auto", label: "자동 추가" },
+        ]}
+      />
 
-      {mode === "notify" ? (
-        <label className={ui.label}>
-          미응답 시
-          <select className={ui.input} name="expiry" defaultValue={initial?.expiry ?? "skip"}>
-            <option value="skip">건너뛰기</option>
-            <option value="add">자동 추가</option>
-            <option value="hold">계속 보류</option>
-          </select>
-        </label>
-      ) : (
-        <input type="hidden" name="expiry" value="skip" />
+      {mode === "notify" && (
+        <div className="flex flex-col gap-1.5">
+          <Label>미응답 시</Label>
+          <Picker
+            value={expiry}
+            onChange={setExpiry}
+            ariaLabel="미응답 시"
+            options={[
+              { value: "skip", label: "건너뛰기" },
+              { value: "add", label: "자동 추가" },
+              { value: "hold", label: "계속 보류" },
+            ]}
+          />
+        </div>
       )}
 
       {initial && (
-        <label className="flex items-center gap-2 text-sm text-zinc-500">
-          <input type="checkbox" name="reflect" value="1" /> 대기 회차에도 반영
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          <input type="checkbox" name="reflect" value="1" className="size-4 accent-primary" /> 대기
+          회차에도 반영
         </label>
       )}
 
-      {state && !state.ok && !state.fields && <p className={ui.alert}>{state.error}</p>}
+      {state && !state.ok && !state.fields && (
+        <p className="text-sm text-destructive">{state.error}</p>
+      )}
 
       <div className="flex gap-2">
-        <button className={ui.button} disabled={pending}>
+        <Button type="submit" className="flex-1" disabled={pending}>
           {initial ? "저장" : "추가"}
-        </button>
-        <button type="button" className={ui.ghost} onClick={onDone}>
+        </Button>
+        <Button type="button" variant="outline" onClick={onDone}>
           취소
-        </button>
+        </Button>
       </div>
     </form>
-  );
-}
-
-function SegBtn({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex-1 rounded-lg py-2 text-sm font-medium ${
-        active
-          ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-          : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800"
-      }`}
-    >
-      {children}
-    </button>
   );
 }
