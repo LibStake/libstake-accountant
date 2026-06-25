@@ -13,6 +13,7 @@
 - 종류(지출/수입) 전환.
 - 발생일시는 자동으로 채워지고 그 자리에서 수정 가능.
 - 카테고리·결제수단은 피커로 고른다(목록 관리는 [`settings.md`](./settings.md)).
+- 기본 결제수단이 지정돼 있으면 입력 시 자동 선택된다(규칙은 [`service-specs/payment-methods.md`](../service-specs/payment-methods.md)).
 
 ## 흐름
 

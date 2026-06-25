@@ -12,7 +12,7 @@
 
 | 문서 | 언제 보는가 |
 |---|---|
-| [`overview.md`](./overview.md) | UX 원칙·폼팩터 전략·비주얼 방향이 궁금할 때 |
+| [`overview.md`](./overview.md) | UX 원칙·폼팩터 전략·접근성·비주얼 방향이 궁금할 때 |
 | [`navigation.md`](./navigation.md) | 화면 지도·정보구조·화면 간 이동·기본 랜딩이 궁금할 때 |
 | [`patterns.md`](./patterns.md) | 로딩·빈·에러·성공·확인 다이얼로그 등 공통 인터랙션이 궁금할 때 |
 
@@ -20,9 +20,10 @@
 
 | 문서 | 언제 보는가 |
 |---|---|
-| [`login.md`](./login.md) | 로그인·PIN 키패드 화면을 다룰 때 |
+| [`login.md`](./login.md) | 가입·로그인·PIN·비밀번호 재설정 화면을 다룰 때 |
+| [`account.md`](./account.md) | 계정·보안(비밀번호·PIN·기기·탈퇴) 화면을 다룰 때 |
 | [`entry.md`](./entry.md) | 입력 화면(기본 랜딩)을 다룰 때 |
-| [`history.md`](./history.md) | 내역(월 단위 리스트·수정/삭제)을 다룰 때 |
+| [`history.md`](./history.md) | 내역(월 단위 리스트·검색·수정/삭제)을 다룰 때 |
 | [`summary.md`](./summary.md) | 요약(월간 집계)을 다룰 때 |
-| [`recurring.md`](./recurring.md) | 정기 알림·승인 화면을 다룰 때 |
-| [`settings.md`](./settings.md) | 관리(카테고리·결제수단·내보내기) 화면을 다룰 때 |
+| [`recurring.md`](./recurring.md) | 정기 거래 등록·수정과 알림 승인 화면을 다룰 때 |
+| [`settings.md`](./settings.md) | 관리(카테고리·결제수단) 화면을 다룰 때 |

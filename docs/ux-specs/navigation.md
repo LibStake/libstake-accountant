@@ -4,12 +4,13 @@
 
 ## 화면 지도
 
-- **로그인/PIN**([`login.md`](./login.md)) — 인증 게이트. 통과해야 나머지에 진입.
+- **인증**([`login.md`](./login.md)) — 가입·로그인·PIN·재설정 게이트. 통과해야 나머지에 진입.
 - **입력**([`entry.md`](./entry.md)) — 인증 후 기본 랜딩. 즉시 기록.
-- **내역**([`history.md`](./history.md)) — 월 단위 거래 리스트·수정/삭제.
-- **요약**([`summary.md`](./summary.md)) — 월간 집계. 관리 진입점.
-- **정기 알림**([`recurring.md`](./recurring.md)) — 도래 회차 승인/해제.
-- **관리**([`settings.md`](./settings.md)) — 카테고리·결제수단·내보내기.
+- **내역**([`history.md`](./history.md)) — 월 단위 거래 리스트·검색·수정/삭제.
+- **요약**([`summary.md`](./summary.md)) — 월간 집계. 관리·계정 진입점.
+- **정기 거래**([`recurring.md`](./recurring.md)) — 등록·수정과 도래 회차 승인/해제.
+- **관리**([`settings.md`](./settings.md)) — 카테고리·결제수단.
+- **계정·보안**([`account.md`](./account.md)) — 로그인 정보·PIN·기기·탈퇴.
 
 ## 기본 랜딩
 
@@ -18,6 +19,7 @@
 ## 주 내비게이션
 
 - 상시 전환 축: **입력 · 내역 · 요약**(모바일=하단 탭, 데스크탑=상단/측면).
-- 요약 → 관리로 진입.
-- 정기 알림은 대기 회차가 있을 때 노출되어 진입(노출 규칙은 [`service-specs/recurring.md`](../service-specs/recurring.md)).
+- 요약 → 관리·계정으로 진입.
+- 정기 거래는 등록·수정 진입과, 대기 회차가 있을 때의 알림 진입을 겸한다(노출 규칙은 [`service-specs/recurring.md`](../service-specs/recurring.md)).
+- 대기 회차가 있으면 주 내비게이션에 **배지(건수)**로 표시한다([`recurring.md`](./recurring.md)).
 - 인증 만료 시 어느 화면에서든 로그인/PIN으로 되돌아간다([`login.md`](./login.md)).
