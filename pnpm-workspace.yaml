@@ -1,0 +1,5 @@
+# pnpm: allow these dependencies to run install/build scripts (native binaries).
+# Required for `next build` (sharp = image optimization) under pnpm, locally and on Vercel.
+allowBuilds:
+  sharp: true
+  unrs-resolver: true
