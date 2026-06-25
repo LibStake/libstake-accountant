@@ -13,4 +13,5 @@
 | 문서 | 언제 보는가 |
 |---|---|
 | [`service-specs/`](./service-specs/CLAUDE.md) | 제품이 무엇을·왜·누구에게? 기능·도메인이 궁금할 때 |
+| [`ux-specs/`](./ux-specs/CLAUDE.md) | 어떻게 보이고·쓰는가 — 화면·인터랙션·상태가 궁금할 때 |
 | [`architecture/`](./architecture/CLAUDE.md) | 어떻게 만드는가 — 스택·구조·데이터·API·인증이 궁금할 때 |
