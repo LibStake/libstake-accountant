@@ -32,7 +32,6 @@ export function EntryForm({
   const [resetKey, setResetKey] = useState(0);
   const amountRef = useRef<HTMLInputElement>(null);
 
-  // 저장 성공 시 폼을 비우고 다음 입력에 대비한다. 셀렉트는 resetKey 리마운트로 초기화.
   const [state, action, pending] = useActionState(
     async (prev: Parameters<typeof createTransaction>[0], formData: FormData) => {
       const r = await createTransaction(prev, formData);

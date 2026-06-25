@@ -1,18 +1,35 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useContext, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { REGEXP_ONLY_DIGITS } from "input-otp";
+import { OTPInputContext, REGEXP_ONLY_DIGITS } from "input-otp";
 import { login, pinUnlock } from "../actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSlot,
-} from "@/components/ui/input-otp";
+import { InputOTP, InputOTPGroup } from "@/components/ui/input-otp";
+import { cn } from "@/lib/utils";
 import { PIN_LENGTH } from "@/lib/auth/constants";
+
+function MaskedSlot({ index }: { index: number }) {
+  const ctx = useContext(OTPInputContext);
+  const slot = ctx?.slots[index];
+  return (
+    <div
+      data-active={slot?.isActive}
+      className={cn(
+        "relative flex size-12 items-center justify-center border-y border-r border-input text-lg transition-all first:rounded-l-lg first:border-l last:rounded-r-lg data-[active=true]:z-10 data-[active=true]:border-ring data-[active=true]:ring-3 data-[active=true]:ring-ring/50 dark:bg-input/30",
+      )}
+    >
+      {slot?.char ? <span className="size-2.5 rounded-full bg-foreground" /> : null}
+      {slot?.hasFakeCaret && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="h-5 w-px animate-caret-blink bg-foreground duration-1000" />
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function LoginForms({ hasFastLogin }: { hasFastLogin: boolean }) {
   const [mode, setMode] = useState<"pin" | "full">(hasFastLogin ? "pin" : "full");
@@ -82,7 +99,6 @@ function FullLogin() {
 function PinUnlock() {
   const [pin, setPin] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
-  // 실패 시 입력을 비워 다시 시도하게 한다.
   const [state, action, pending] = useActionState(
     async (prev: Parameters<typeof pinUnlock>[0], formData: FormData) => {
       const r = await pinUnlock(prev, formData);
@@ -111,7 +127,7 @@ function PinUnlock() {
       >
         <InputOTPGroup>
           {Array.from({ length: PIN_LENGTH }).map((_, i) => (
-            <InputOTPSlot key={i} index={i} className="size-12 text-lg" />
+            <MaskedSlot key={i} index={i} />
           ))}
         </InputOTPGroup>
       </InputOTP>
