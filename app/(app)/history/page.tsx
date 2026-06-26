@@ -1,4 +1,5 @@
 import { requireSession } from "@/lib/auth/guard";
+import { reconcile } from "@/lib/recurring/reconcile";
 import * as repo from "@/lib/domain/repo";
 import {
   addMonth,
@@ -15,6 +16,8 @@ export default async function HistoryPage({
   searchParams: Promise<{ m?: string }>;
 }) {
   const { uid } = await requireSession();
+  // 자동 모드가 실체화한 거래를 읽기 전에 채운다(layout reconcile과의 동시 렌더 레이스 방지).
+  await reconcile(uid);
   const sp = await searchParams;
   const ym = parseYearMonthKey(sp.m ?? "") ?? nowYearMonth();
   const [transactions, categories, payments] = await Promise.all([
