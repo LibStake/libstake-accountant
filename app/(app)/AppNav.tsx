@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PencilLine, PieChart, ReceiptText, Repeat, Settings } from "lucide-react";
+import { LifeBuoy, PencilLine, PieChart, ReceiptText, Repeat, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
@@ -10,6 +10,7 @@ const TABS = [
   { href: "/", label: "입력", icon: PencilLine },
   { href: "/history", label: "내역", icon: ReceiptText },
   { href: "/recurring", label: "정기", icon: Repeat },
+  { href: "/liquidity", label: "유동성", icon: LifeBuoy },
   { href: "/summary", label: "요약", icon: PieChart },
   { href: "/settings", label: "관리", icon: Settings },
 ] as const;
@@ -65,7 +66,7 @@ export function TopNav({ pendingCount }: { pendingCount: number }) {
 export function BottomNav({ pendingCount }: { pendingCount: number }) {
   const pathname = usePathname();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-10 grid grid-cols-5 border-t bg-background pb-[env(safe-area-inset-bottom)] sm:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-10 grid grid-cols-6 border-t bg-background pb-[env(safe-area-inset-bottom)] sm:hidden">
       {TABS.map((t) => {
         const active = isActive(pathname, t.href);
         const Icon = t.icon;

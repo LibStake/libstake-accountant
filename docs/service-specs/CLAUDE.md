@@ -10,3 +10,4 @@
 | [`categories.md`](./categories.md) | 카테고리(분류)를 다룰 때 |
 | [`payment-methods.md`](./payment-methods.md) | 결제수단(카드·계좌·페이)을 다룰 때 |
 | [`recurring.md`](./recurring.md) | 정기 거래와 도래 처리를 다룰 때 |
+| [`liquidity.md`](./liquidity.md) | 다음 수입까지 필요한 최소 보유액(유동성)을 다룰 때 |

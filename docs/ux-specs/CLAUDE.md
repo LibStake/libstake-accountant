@@ -26,4 +26,5 @@
 | [`history.md`](./history.md) | 내역(월 단위 리스트·검색·수정/삭제)을 다룰 때 |
 | [`summary.md`](./summary.md) | 요약(월간 집계)을 다룰 때 |
 | [`recurring.md`](./recurring.md) | 정기 거래 등록·수정과 알림 승인 화면을 다룰 때 |
+| [`liquidity.md`](./liquidity.md) | 유동성(다음 수입까지 필요한 최소 보유액) 화면을 다룰 때 |
 | [`settings.md`](./settings.md) | 관리(카테고리·결제수단) 화면을 다룰 때 |
