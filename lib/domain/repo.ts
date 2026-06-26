@@ -223,7 +223,7 @@ function mapTx(d: DocumentSnapshot): Transaction {
   };
 }
 
-export async function listMonthTransactions(
+export async function listTransactionsInRange(
   uid: string,
   range: { start: Date; end: Date },
 ): Promise<Transaction[]> {
@@ -231,6 +231,17 @@ export async function listMonthTransactions(
     .where("occurredAt", ">=", Timestamp.fromDate(range.start))
     .where("occurredAt", "<", Timestamp.fromDate(range.end))
     .orderBy("occurredAt", "desc")
+    .get();
+  return snap.docs.map(mapTx);
+}
+
+export async function listRecentTransactions(
+  uid: string,
+  limit: number,
+): Promise<Transaction[]> {
+  const snap = await txCol(uid)
+    .orderBy("occurredAt", "desc")
+    .limit(limit)
     .get();
   return snap.docs.map(mapTx);
 }

@@ -1,8 +1,11 @@
 import { requireSession } from "@/lib/auth/guard";
 import { reconcile } from "@/lib/recurring/reconcile";
+import { enumerateOccurrences } from "@/lib/recurring/schedule";
 import * as recRepo from "@/lib/recurring/repo";
 import * as domRepo from "@/lib/domain/repo";
 import { RecurringView } from "./RecurringView";
+
+const HORIZON_MS = 366 * 24 * 60 * 60 * 1000;
 
 export default async function RecurringPage() {
   const { uid } = await requireSession();
@@ -14,9 +17,14 @@ export default async function RecurringPage() {
     domRepo.listCategories(uid),
     domRepo.listPayments(uid),
   ]);
+  const now = new Date();
+  const horizon = new Date(now.getTime() + HORIZON_MS);
   return (
     <RecurringView
-      defs={defs}
+      defs={defs.map((d) => ({
+        ...d,
+        nextAt: (enumerateOccurrences(d, now, horizon)[0] ?? horizon).toISOString(),
+      }))}
       pending={pending.map((o) => ({
         id: o.id,
         name: o.name,

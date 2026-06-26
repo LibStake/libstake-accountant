@@ -72,6 +72,45 @@ test.describe("정기 거래", () => {
     await expect.poll(async () => (await getOccurrence(appUser.uid, occId))?.status).toBe("skipped");
   });
 
+  test("예상 지출은 등록 지출을 뷰 주기로 환산해 합산한다(수입 제외)", async ({ page, appUser }) => {
+    await seedRecurringDef(appUser.uid, {
+      name: "월구독",
+      amount: 30000,
+      type: "expense",
+      freq: "monthly",
+      day: 10,
+    });
+    await seedRecurringDef(appUser.uid, {
+      name: "주간적금",
+      amount: 10000,
+      type: "expense",
+      freq: "weekly",
+      weekday: 1,
+    });
+    await seedRecurringDef(appUser.uid, {
+      name: "월급",
+      amount: 1000000,
+      type: "income",
+      freq: "monthly",
+      day: 25,
+    });
+
+    // 연 환산 = 30000*12 + 10000*52 = 880,000 (수입 제외).
+    await page.goto("/recurring");
+
+    // 기본 월간 뷰: round(880000/12) = 73,333.
+    await expect(page.getByText("예상 월간 지출")).toBeVisible();
+    await expect(page.getByText("73,333원")).toBeVisible();
+
+    await page.getByText("연간", { exact: true }).click();
+    await expect(page.getByText("예상 연간 지출")).toBeVisible();
+    await expect(page.getByText("880,000원")).toBeVisible();
+
+    await page.getByText("주간", { exact: true }).click();
+    await expect(page.getByText("예상 주간 지출")).toBeVisible();
+    await expect(page.getByText("16,923원")).toBeVisible();
+  });
+
   test("정기 정의를 삭제하면 정의와 대기 회차가 사라진다", async ({ page, appUser }) => {
     const defId = await seedRecurringDef(appUser.uid, {
       name: "보험",

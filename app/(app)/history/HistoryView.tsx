@@ -1,9 +1,18 @@
 "use client";
 
-import { useActionState, useMemo, useOptimistic, useState } from "react";
+import {
+  useActionState,
+  useEffect,
+  useMemo,
+  useOptimistic,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { formatKst, toKstInputValue } from "@/lib/kst";
 import type { TxSource, TxType } from "@/lib/domain/types";
 import { Button } from "@/components/ui/button";
@@ -15,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,23 +53,42 @@ type Tx = {
 };
 type Opt = { id: string; name: string };
 
+export type HistoryUnit = "day" | "month" | "year";
+
 const ALL = "__all__";
 
+const UNITS: { value: HistoryUnit; label: string }[] = [
+  { value: "day", label: "일" },
+  { value: "month", label: "월" },
+  { value: "year", label: "연" },
+];
+
 export function HistoryView({
-  monthLabel,
+  unit,
+  periodLabel,
+  periodKey,
   prevKey,
   nextKey,
+  dayKey,
+  monthKey,
+  yearKey,
   transactions,
   categories,
   payments,
 }: {
-  monthLabel: string;
+  unit: HistoryUnit;
+  periodLabel: string;
+  periodKey: string;
   prevKey: string;
   nextKey: string;
+  dayKey: string;
+  monthKey: string;
+  yearKey: string;
   transactions: Tx[];
   categories: Opt[];
   payments: Opt[];
 }) {
+  const router = useRouter();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("");
   const [pay, setPay] = useState("");
@@ -84,87 +113,143 @@ export function HistoryView({
     [payments],
   );
 
+  // 시간 오름차(과거→최신). 최신 항목이 리스트 최하단에 온다.
   const filtered = useMemo(
     () =>
-      optimisticTx.filter((t) => {
-        if (q && !t.name.toLowerCase().includes(q.toLowerCase())) return false;
-        if (cat && t.categoryId !== cat) return false;
-        if (pay && t.paymentMethodId !== pay) return false;
-        if (type && t.type !== type) return false;
-        return true;
-      }),
+      optimisticTx
+        .filter((t) => {
+          if (q && !t.name.toLowerCase().includes(q.toLowerCase())) return false;
+          if (cat && t.categoryId !== cat) return false;
+          if (pay && t.paymentMethodId !== pay) return false;
+          if (type && t.type !== type) return false;
+          return true;
+        })
+        .sort(
+          (a, b) =>
+            new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime(),
+        ),
     [optimisticTx, q, cat, pay, type],
   );
 
+  const net = useMemo(
+    () =>
+      filtered.reduce(
+        (sum, t) => sum + (t.type === "income" ? t.amount : -t.amount),
+        0,
+      ),
+    [filtered],
+  );
+  const netLabel = `${net > 0 ? "+" : ""}${net.toLocaleString("ko-KR")}원`;
+
+  const listRef = useRef<HTMLUListElement>(null);
+  // 페이지·단위·기간 진입 시 최신(최하단)으로 내린다. 필터·낙관적 변경엔 위치를 건드리지 않는다.
+  useEffect(() => {
+    const el = listRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [unit, periodKey]);
+
+  const unitHref: Record<HistoryUnit, string> = {
+    day: `/history?u=day&d=${dayKey}`,
+    month: `/history?u=month&d=${monthKey}`,
+    year: `/history?u=year&d=${yearKey}`,
+  };
+
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-4 px-6 py-8">
-      <div className="flex items-center justify-between">
-        <Button asChild variant="ghost" size="icon" aria-label="이전 달">
-          <Link href={`/history?m=${prevKey}`}>
-            <ChevronLeft />
-          </Link>
-        </Button>
-        <h1 className="font-semibold">{monthLabel}</h1>
-        <Button asChild variant="ghost" size="icon" aria-label="다음 달">
-          <Link href={`/history?m=${nextKey}`}>
-            <ChevronRight />
-          </Link>
-        </Button>
+    <div className="mx-auto flex h-full w-full max-w-md flex-col">
+      <div className="flex flex-col gap-3 px-6 pt-6 pb-3">
+        <div className="flex items-center justify-between">
+          <Button asChild variant="ghost" size="icon" aria-label="이전 기간">
+            <Link href={`/history?u=${unit}&d=${prevKey}`}>
+              <ChevronLeft />
+            </Link>
+          </Button>
+          <h1 className="font-semibold">{periodLabel}</h1>
+          <Button asChild variant="ghost" size="icon" aria-label="다음 기간">
+            <Link href={`/history?u=${unit}&d=${nextKey}`}>
+              <ChevronRight />
+            </Link>
+          </Button>
+        </div>
+
+        <ToggleGroup
+          type="single"
+          value={unit}
+          onValueChange={(v) => v && router.push(unitHref[v as HistoryUnit])}
+          variant="outline"
+          spacing={0}
+          className="w-full"
+        >
+          {UNITS.map((u) => (
+            <ToggleGroupItem
+              key={u.value}
+              value={u.value}
+              className="flex-1 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+            >
+              {u.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+
+        <Input
+          placeholder="항목명 검색"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <div className="flex gap-2">
+          <Select value={type || ALL} onValueChange={(v) => setType(v === ALL ? "" : (v as TxType))}>
+            <SelectTrigger className="w-full flex-1" aria-label="종류 필터">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>전체</SelectItem>
+              <SelectItem value="expense">지출</SelectItem>
+              <SelectItem value="income">수입</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={cat || ALL} onValueChange={(v) => setCat(v === ALL ? "" : v)}>
+            <SelectTrigger className="w-full flex-1" aria-label="카테고리 필터">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>카테고리</SelectItem>
+              {categories.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={pay || ALL} onValueChange={(v) => setPay(v === ALL ? "" : v)}>
+            <SelectTrigger className="w-full flex-1" aria-label="결제수단 필터">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>결제수단</SelectItem>
+              {payments.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      <Input
-        placeholder="항목명 검색"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
-      <div className="flex gap-2">
-        <Select value={type || ALL} onValueChange={(v) => setType(v === ALL ? "" : (v as TxType))}>
-          <SelectTrigger className="w-full flex-1" aria-label="종류 필터">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>전체</SelectItem>
-            <SelectItem value="expense">지출</SelectItem>
-            <SelectItem value="income">수입</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={cat || ALL} onValueChange={(v) => setCat(v === ALL ? "" : v)}>
-          <SelectTrigger className="w-full flex-1" aria-label="카테고리 필터">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>카테고리</SelectItem>
-            {categories.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={pay || ALL} onValueChange={(v) => setPay(v === ALL ? "" : v)}>
-          <SelectTrigger className="w-full flex-1" aria-label="결제수단 필터">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>결제수단</SelectItem>
-            {payments.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {filtered.length === 0 ? (
-        <p className="py-12 text-center text-sm text-muted-foreground">
-          {optimisticTx.length === 0
-            ? "이 달엔 거래가 없어요. 입력에서 기록해보세요."
-            : "조건에 맞는 거래가 없어요."}
-        </p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {filtered.map((t) => (
+      <ul
+        ref={listRef}
+        className={cn(
+          "flex min-h-0 flex-1 flex-col overflow-y-auto px-6",
+          filtered.length ? "gap-2 pb-3" : "items-center justify-center",
+        )}
+      >
+        {filtered.length === 0 ? (
+          <li className="text-center text-sm text-muted-foreground">
+            {optimisticTx.length === 0
+              ? "이 기간엔 거래가 없어요. 입력에서 기록해보세요."
+              : "조건에 맞는 거래가 없어요."}
+          </li>
+        ) : (
+          filtered.map((t) => (
             <Row
               key={t.id}
               tx={t}
@@ -174,9 +259,21 @@ export function HistoryView({
               payName={payName}
               onDelete={handleDelete}
             />
-          ))}
-        </ul>
-      )}
+          ))
+        )}
+      </ul>
+
+      <div className="flex items-center justify-between border-t px-6 py-4">
+        <span className="text-sm text-muted-foreground">총 금액</span>
+        <span
+          className={cn(
+            "text-lg font-semibold tabular-nums",
+            net < 0 ? "text-destructive" : "text-foreground",
+          )}
+        >
+          {netLabel}
+        </span>
+      </div>
     </div>
   );
 }
@@ -275,7 +372,7 @@ function Row({
   }
 
   const sign = tx.type === "income" ? "+" : "-";
-  const amountColor = tx.type === "income" ? "text-emerald-600" : "text-foreground";
+  const amountColor = tx.type === "expense" ? "text-destructive" : "text-foreground";
 
   return (
     <li className="flex flex-col gap-1 rounded-lg border p-3 duration-200 animate-in fade-in-0">

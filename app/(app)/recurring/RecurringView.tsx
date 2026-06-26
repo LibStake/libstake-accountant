@@ -1,7 +1,14 @@
 "use client";
 
-import { useActionState, useEffect, useOptimistic, useState } from "react";
+import {
+  useActionState,
+  useEffect,
+  useOptimistic,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { formatKst } from "@/lib/kst";
 import type { Freq, RecurMode, RecurringDef, TxType } from "@/lib/domain/types";
 import type { Result } from "@/lib/server/result";
@@ -41,6 +48,7 @@ import {
 } from "./actions";
 
 type Opt = { id: string; name: string };
+type DefWithNext = RecurringDef & { nextAt: string };
 type Pending = { id: string; name: string; amount: number; type: TxType; occurredAt: string };
 type FormAction = (prev: Result<null> | null, fd: FormData) => Promise<Result<null>>;
 type Picks = { value: string; label: string }[];
@@ -48,6 +56,16 @@ type Picks = { value: string; label: string }[];
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 const pad = (n: number) => String(n).padStart(2, "0");
 const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
+
+// 주기별 연간 도래 횟수. 예상 지출은 연간 합을 구해 뷰별로 환산한다.
+const ANNUAL_COUNT: Record<Freq, number> = {
+  daily: 365,
+  weekly: 52,
+  monthly: 12,
+  yearly: 1,
+};
+const VIEW_LABEL = { week: "주간", month: "월간", year: "연간" } as const;
+type RecurView = keyof typeof VIEW_LABEL;
 
 function describe(d: RecurringDef): string {
   const t = `${pad(d.hour)}:${pad(d.minute)}`;
@@ -90,12 +108,13 @@ export function RecurringView({
   categories,
   payments,
 }: {
-  defs: RecurringDef[];
+  defs: DefWithNext[];
   pending: Pending[];
   categories: Opt[];
   payments: Opt[];
 }) {
   const [adding, setAdding] = useState(false);
+  const [view, setView] = useState<RecurView>("month");
 
   const [optimisticPending, removePending] = useOptimistic(
     pending,
@@ -120,79 +139,136 @@ export function RecurringView({
     await deleteRecurring(formData);
   }
 
+  // 도래가 임박한 순(오름차). 최신 도래가 리스트 최하단에 온다.
+  const sortedDefs = [...optimisticDefs].sort((a, b) =>
+    a.nextAt.localeCompare(b.nextAt),
+  );
+
+  const annualExpense = optimisticDefs
+    .filter((d) => d.type === "expense")
+    .reduce((sum, d) => sum + d.amount * ANNUAL_COUNT[d.freq], 0);
+  const projected =
+    view === "year"
+      ? annualExpense
+      : view === "month"
+        ? Math.round(annualExpense / 12)
+        : Math.round(annualExpense / 52);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // 뷰·탭 진입과 추가 폼 열림 시 최하단으로 내린다.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [view, adding]);
+
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-8 px-6 py-8">
-      <h1 className="text-xl font-semibold">정기 거래</h1>
+    <div className="mx-auto flex h-full w-full max-w-md flex-col">
+      <div className="flex flex-col gap-3 px-6 pt-6 pb-3">
+        <h1 className="text-xl font-semibold">정기 거래</h1>
+        <ToggleGroup
+          type="single"
+          value={view}
+          onValueChange={(v) => v && setView(v as RecurView)}
+          variant="outline"
+          spacing={0}
+          className="w-full"
+        >
+          {(Object.keys(VIEW_LABEL) as RecurView[]).map((v) => (
+            <ToggleGroupItem
+              key={v}
+              value={v}
+              className="flex-1 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+            >
+              {VIEW_LABEL[v]}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </div>
 
-      {optimisticPending.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <h2 className="font-medium">대기 회차</h2>
-          <ul className="flex flex-col gap-2">
-            {optimisticPending.map((o) => (
-              <li
-                key={o.id}
-                className="flex items-center justify-between gap-2 rounded-lg border p-3"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">
-                    {o.name}{" "}
-                    <span className={o.type === "income" ? "text-emerald-600" : ""}>
-                      {o.type === "income" ? "+" : "-"}
-                      {won(o.amount)}
-                    </span>
-                  </p>
-                  <p className="text-xs text-muted-foreground">{formatKst(new Date(o.occurredAt))}</p>
-                </div>
-                <div className="flex shrink-0 gap-1">
-                  <form action={onApprove}>
-                    <input type="hidden" name="occId" value={o.id} />
-                    <Button type="submit" variant="ghost" size="xs" className="text-emerald-600">
-                      승인
-                    </Button>
-                  </form>
-                  <form action={onSkip}>
-                    <input type="hidden" name="occId" value={o.id} />
-                    <Button type="submit" variant="ghost" size="xs" className="text-muted-foreground">
-                      해제
-                    </Button>
-                  </form>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <section className="flex flex-col gap-3">
-        <h2 className="font-medium">등록된 정기 거래</h2>
-        {optimisticDefs.length === 0 ? (
-          <p className="text-sm text-muted-foreground">등록된 정기 거래가 없어요.</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {optimisticDefs.map((d) => (
-              <DefRow
-                key={d.id}
-                def={d}
-                categories={categories}
-                payments={payments}
-                onDelete={onDeleteDef}
-              />
-            ))}
-          </ul>
+      <div
+        ref={scrollRef}
+        className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6 pb-3"
+      >
+        {optimisticPending.length > 0 && (
+          <section className="flex flex-col gap-3">
+            <h2 className="font-medium">대기 회차</h2>
+            <ul className="flex flex-col gap-2">
+              {optimisticPending.map((o) => (
+                <li
+                  key={o.id}
+                  className="flex items-center justify-between gap-2 rounded-lg border p-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {o.name}{" "}
+                      <span className={o.type === "expense" ? "text-destructive" : ""}>
+                        {o.type === "income" ? "+" : "-"}
+                        {won(o.amount)}
+                      </span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">{formatKst(new Date(o.occurredAt))}</p>
+                  </div>
+                  <div className="flex shrink-0 gap-1">
+                    <form action={onApprove}>
+                      <input type="hidden" name="occId" value={o.id} />
+                      <Button type="submit" variant="ghost" size="xs" className="text-emerald-600">
+                        승인
+                      </Button>
+                    </form>
+                    <form action={onSkip}>
+                      <input type="hidden" name="occId" value={o.id} />
+                      <Button type="submit" variant="ghost" size="xs" className="text-muted-foreground">
+                        해제
+                      </Button>
+                    </form>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
-        {adding ? (
-          <DefForm
-            action={createRecurring}
-            categories={categories}
-            payments={payments}
-            onDone={() => setAdding(false)}
-          />
-        ) : (
-          <Button variant="outline" onClick={() => setAdding(true)}>
+
+        <section className="flex flex-col gap-3">
+          <h2 className="font-medium">등록된 정기 거래</h2>
+          {sortedDefs.length === 0 ? (
+            <p className="text-sm text-muted-foreground">등록된 정기 거래가 없어요.</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {sortedDefs.map((d) => (
+                <DefRow
+                  key={d.id}
+                  def={d}
+                  categories={categories}
+                  payments={payments}
+                  onDelete={onDeleteDef}
+                />
+              ))}
+            </ul>
+          )}
+          {adding && (
+            <DefForm
+              action={createRecurring}
+              categories={categories}
+              payments={payments}
+              onDone={() => setAdding(false)}
+            />
+          )}
+        </section>
+      </div>
+
+      <div className="flex flex-col gap-3 border-t px-6 py-4">
+        {!adding && (
+          <Button variant="outline" className="w-full" onClick={() => setAdding(true)}>
             정기 거래 추가
           </Button>
         )}
-      </section>
+        <div className="flex items-baseline justify-between">
+          <span className="text-sm text-muted-foreground">
+            예상 {VIEW_LABEL[view]} 지출
+          </span>
+          <span className="text-lg font-semibold tabular-nums">{won(projected)}</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -228,7 +304,7 @@ function DefRow({
     <li className="flex flex-col gap-1 rounded-lg border p-3">
       <div className="flex items-baseline justify-between gap-2">
         <span className="min-w-0 truncate font-medium">{def.name}</span>
-        <span className={`shrink-0 tabular-nums ${def.type === "income" ? "text-emerald-600" : ""}`}>
+        <span className={cn("shrink-0 tabular-nums", def.type === "expense" && "text-destructive")}>
           {def.type === "income" ? "+" : "-"}
           {won(def.amount)}
         </span>

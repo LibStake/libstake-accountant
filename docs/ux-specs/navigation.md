@@ -6,7 +6,7 @@
 
 - **인증**([`login.md`](./login.md)) — 가입·로그인·PIN·재설정 게이트. 통과해야 나머지에 진입.
 - **입력**([`entry.md`](./entry.md)) — 인증 후 기본 랜딩. 즉시 기록.
-- **내역**([`history.md`](./history.md)) — 월 단위 거래 리스트·검색·수정/삭제.
+- **내역**([`history.md`](./history.md)) — 기간 단위(일·월·연) 거래 리스트·검색·수정/삭제.
 - **요약**([`summary.md`](./summary.md)) — 월간 집계.
 - **정기 거래**([`recurring.md`](./recurring.md)) — 등록·수정과 도래 회차 승인/해제.
 - **관리**([`settings.md`](./settings.md)) — 카테고리·결제수단. 계정·보안 진입점.

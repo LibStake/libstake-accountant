@@ -12,9 +12,9 @@ export default async function AppLayout({
   await reconcile(uid);
   const pendingCount = await countPending(uid);
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex h-dvh flex-col overflow-hidden">
       <TopNav pendingCount={pendingCount} />
-      <main className="flex-1 pb-16 sm:pb-0">{children}</main>
+      <main className="min-h-0 flex-1 overflow-y-auto pb-16 sm:pb-0">{children}</main>
       <BottomNav pendingCount={pendingCount} />
     </div>
   );

@@ -1,8 +1,9 @@
 // KST(UTC+9, DST 없음) 고정. 저장은 절대 시각, 월 경계·표시·입력 해석은 KST 기준.
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
-// month는 1-12.
+// month는 1-12, day는 1-31.
 export type YearMonth = { year: number; month: number };
+export type YearMonthDay = YearMonth & { day: number };
 
 export function nowYearMonth(): YearMonth {
   return dateToYearMonth(new Date());
@@ -11,6 +12,15 @@ export function nowYearMonth(): YearMonth {
 export function dateToYearMonth(d: Date): YearMonth {
   const k = new Date(d.getTime() + KST_OFFSET_MS);
   return { year: k.getUTCFullYear(), month: k.getUTCMonth() + 1 };
+}
+
+export function nowYearMonthDay(): YearMonthDay {
+  const k = new Date(Date.now() + KST_OFFSET_MS);
+  return {
+    year: k.getUTCFullYear(),
+    month: k.getUTCMonth() + 1,
+    day: k.getUTCDate(),
+  };
 }
 
 // 해당 KST 월의 [start, end) 절대 시각 경계.
@@ -36,6 +46,51 @@ export function parseYearMonthKey(key: string): YearMonth | null {
   const month = Number(m[2]);
   if (month < 1 || month > 12) return null;
   return { year: Number(m[1]), month };
+}
+
+// 해당 KST 일의 [start, end) 절대 시각 경계.
+export function dayRange(d: YearMonthDay): { start: Date; end: Date } {
+  const start = new Date(Date.UTC(d.year, d.month - 1, d.day) - KST_OFFSET_MS);
+  const end = new Date(Date.UTC(d.year, d.month - 1, d.day + 1) - KST_OFFSET_MS);
+  return { start, end };
+}
+
+export function addDay(d: YearMonthDay, delta: number): YearMonthDay {
+  const k = new Date(Date.UTC(d.year, d.month - 1, d.day + delta));
+  return {
+    year: k.getUTCFullYear(),
+    month: k.getUTCMonth() + 1,
+    day: k.getUTCDate(),
+  };
+}
+
+export function dateKey(d: YearMonthDay): string {
+  return `${yearMonthKey(d)}-${String(d.day).padStart(2, "0")}`;
+}
+
+export function parseDateKey(key: string): YearMonthDay | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
+  if (!m) return null;
+  const d = { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]) };
+  const k = new Date(Date.UTC(d.year, d.month - 1, d.day));
+  if (
+    k.getUTCFullYear() !== d.year ||
+    k.getUTCMonth() + 1 !== d.month ||
+    k.getUTCDate() !== d.day
+  )
+    return null;
+  return d;
+}
+
+// 해당 KST 연의 [start, end) 절대 시각 경계.
+export function yearRange(year: number): { start: Date; end: Date } {
+  const start = new Date(Date.UTC(year, 0, 1) - KST_OFFSET_MS);
+  const end = new Date(Date.UTC(year + 1, 0, 1) - KST_OFFSET_MS);
+  return { start, end };
+}
+
+export function parseYear(key: string): number | null {
+  return /^\d{4}$/.test(key) ? Number(key) : null;
 }
 
 // 절대 시각 → datetime-local 표시값 "YYYY-MM-DDTHH:mm"(KST 벽시계).

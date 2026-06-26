@@ -21,7 +21,7 @@ export default async function SummaryPage({
   const sp = await searchParams;
   const ym = parseYearMonthKey(sp.m ?? "") ?? nowYearMonth();
   const [txns, categories] = await Promise.all([
-    repo.listMonthTransactions(uid, monthRange(ym)),
+    repo.listTransactionsInRange(uid, monthRange(ym)),
     repo.listCategories(uid),
   ]);
 

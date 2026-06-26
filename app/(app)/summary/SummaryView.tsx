@@ -75,7 +75,7 @@ export function SummaryView({
       <p className="text-sm text-muted-foreground">
         순{" "}
         <span
-          className={`font-medium tabular-nums ${net < 0 ? "text-foreground" : "text-emerald-600"}`}
+          className={`font-medium tabular-nums ${net < 0 ? "text-destructive" : "text-foreground"}`}
         >
           {won(net)}
         </span>
