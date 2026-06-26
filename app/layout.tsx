@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -37,6 +39,8 @@ export default function RootLayout({
         {children}
         {/* 모바일 토스트를 하단 탭(높이 4rem)과 safe-area 위로 띄운다. */}
         <Toaster mobileOffset={{ bottom: "calc(4rem + env(safe-area-inset-bottom) + 0.5rem)" }} />
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
