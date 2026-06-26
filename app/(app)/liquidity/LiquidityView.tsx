@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { HORIZON_DAYS, type LiquidityResult } from "@/lib/liquidity/project";
+import type { LiquidityResult } from "@/lib/liquidity/project";
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
@@ -18,9 +18,11 @@ const container = "mx-auto flex w-full max-w-md flex-col gap-6 px-6 py-8";
 export function LiquidityView({
   result,
   hasDefs,
+  hasIncome,
 }: {
   result: LiquidityResult;
   hasDefs: boolean;
+  hasIncome: boolean;
 }) {
   const { required, criticalAt, recoveredAt, structuralDeficit, checkpoints, flows } =
     result;
@@ -55,25 +57,37 @@ export function LiquidityView({
     <div className={container}>
       <h1 className="font-semibold">유동성</h1>
 
-      {structuralDeficit && (
+      {!hasIncome ? (
+        <Card>
+          <CardContent className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium">정기 수입을 등록해 주세요</p>
+              <p className="text-xs text-muted-foreground">
+                다음 수입까지 필요한 금액은 정기 수입(월급 등)을 알아야 계산할 수 있어요. 지금은
+                지출만 등록돼 있어요.
+              </p>
+            </div>
+            <Button asChild size="sm" className="self-start">
+              <Link href="/recurring">정기 수입 등록</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : structuralDeficit ? (
         <Card>
           <CardContent className="flex flex-col gap-1">
             <p className="text-sm font-medium text-destructive">
-              정기 수입이 지출을 못 메워요
+              정기 수입이 지출을 못 따라가요
             </p>
             <p className="text-xs text-muted-foreground">
-              앞으로 {HORIZON_DAYS}일 안에서는 누적이 회복되지 않아요. 더 긴 흐름을 확인하세요.
+              들어오는 정기 수입보다 나가는 정기 지출이 많아요.
+              {criticalAt ? ` 가장 위험한 날은 ${kstDate(criticalAt)}.` : ""}
             </p>
           </CardContent>
         </Card>
-      )}
-
-      {required === 0 ? (
+      ) : required === 0 ? (
         <Card>
           <CardContent>
-            <p className="text-sm">
-              앞으로 {HORIZON_DAYS}일간 정기 지출로 인한 부족 위험이 없어요.
-            </p>
+            <p className="text-sm">앞으로 두 달간 정기 지출로 인한 부족 위험이 없어요.</p>
           </CardContent>
         </Card>
       ) : (
@@ -89,7 +103,7 @@ export function LiquidityView({
         </Card>
       )}
 
-      {checkpoints.length > 0 && (
+      {hasIncome && checkpoints.length > 0 && (
         <section className="flex flex-col gap-3">
           <h2 className="text-sm font-medium text-muted-foreground">언제까지 얼마</h2>
           <ul className="flex flex-col gap-2">
@@ -136,11 +150,13 @@ export function LiquidityView({
                     {f.type === "income" ? "+" : "−"}
                     {won(f.amount)}
                   </span>
-                  <span
-                    className={`text-xs tabular-nums ${f.run === 0 ? "font-medium text-destructive" : "text-muted-foreground"}`}
-                  >
-                    잔여 {won(f.run)}
-                  </span>
+                  {hasIncome && (
+                    <span
+                      className={`text-xs tabular-nums ${f.run === 0 ? "font-medium text-destructive" : "text-muted-foreground"}`}
+                    >
+                      잔여 {won(f.run)}
+                    </span>
+                  )}
                 </div>
               </li>
             ))}
