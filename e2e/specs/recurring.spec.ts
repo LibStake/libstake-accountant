@@ -72,43 +72,50 @@ test.describe("정기 거래", () => {
     await expect.poll(async () => (await getOccurrence(appUser.uid, occId))?.status).toBe("skipped");
   });
 
-  test("예상 지출은 등록 지출을 뷰 주기로 환산해 합산한다(수입 제외)", async ({ page, appUser }) => {
-    await seedRecurringDef(appUser.uid, {
-      name: "월구독",
-      amount: 30000,
-      type: "expense",
-      freq: "monthly",
-      day: 10,
-    });
-    await seedRecurringDef(appUser.uid, {
-      name: "주간적금",
-      amount: 10000,
-      type: "expense",
-      freq: "weekly",
-      weekday: 1,
-    });
-    await seedRecurringDef(appUser.uid, {
-      name: "월급",
-      amount: 1000000,
-      type: "income",
-      freq: "monthly",
-      day: 25,
-    });
+  test("탭별 net 합계와 분해 팝오버, '모두'엔 합계 없음", async ({ page, appUser }) => {
+    // auto 모드로 시드해 대기 회차 노이즈 없이 정의 리스트·합계만 검증한다.
+    await seedRecurringDef(appUser.uid, { name: "커피", amount: 10000, type: "expense", freq: "weekly", weekday: 1, mode: "auto" });
+    await seedRecurringDef(appUser.uid, { name: "넷플릭스", amount: 17000, type: "expense", freq: "monthly", day: 10, mode: "auto" });
+    await seedRecurringDef(appUser.uid, { name: "용돈", amount: 50000, type: "income", freq: "monthly", day: 25, mode: "auto" });
+    await seedRecurringDef(appUser.uid, { name: "교통", amount: 3000, type: "expense", freq: "daily", mode: "auto" });
+    await seedRecurringDef(appUser.uid, { name: "보험", amount: 600000, type: "expense", freq: "yearly", month: 6, day: 1, mode: "auto" });
 
-    // 연 환산 = 30000*12 + 10000*52 = 880,000 (수입 제외).
     await page.goto("/recurring");
 
-    // 기본 월간 뷰: round(880000/12) = 73,333.
-    await expect(page.getByText("예상 월간 지출")).toBeVisible();
-    await expect(page.getByText("73,333원")).toBeVisible();
+    // 모두(기본): 전체 노출, 합계 푸터 없음.
+    await expect(page.getByText("커피")).toBeVisible();
+    await expect(page.getByText("보험")).toBeVisible();
+    await expect(page.getByText("주간 합계")).toHaveCount(0);
+    await expect(page.getByText("월간 합계")).toHaveCount(0);
 
-    await page.getByText("연간", { exact: true }).click();
-    await expect(page.getByText("예상 연간 지출")).toBeVisible();
-    await expect(page.getByText("880,000원")).toBeVisible();
-
+    // 주간: 매주 항목만, net -10,000.
     await page.getByText("주간", { exact: true }).click();
-    await expect(page.getByText("예상 주간 지출")).toBeVisible();
-    await expect(page.getByText("16,923원")).toBeVisible();
+    await expect(page.getByText("커피")).toBeVisible();
+    await expect(page.getByText("넷플릭스")).toHaveCount(0);
+    await expect(page.getByText("주간 합계")).toBeVisible();
+
+    // 월간: 매월 항목만, 월간 합계 +33,000 / 예상 월간 합계 -101,583.
+    await page.getByText("월간", { exact: true }).click();
+    await expect(page.getByText("넷플릭스")).toBeVisible();
+    await expect(page.getByText("커피")).toHaveCount(0);
+    await expect(page.getByText("월간 합계", { exact: true })).toBeVisible();
+    await expect(page.getByText("예상 월간 합계")).toBeVisible();
+    await expect(page.getByText("-101,583원")).toBeVisible();
+
+    // 월간 합계 클릭 → 수입/지출/합계 분해 팝오버.
+    await page.getByText("월간 합계", { exact: true }).click();
+    const pop = page.locator('[data-slot="popover-content"]');
+    await expect(pop.getByText("수입")).toBeVisible();
+    await expect(pop.getByText("+50,000원")).toBeVisible();
+    await expect(pop.getByText("-17,000원")).toBeVisible();
+    await expect(pop.getByText("+33,000원")).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    // 연간: 예상 연간 합계 -1,819,000.
+    await page.getByText("연간", { exact: true }).click();
+    await expect(page.getByText("보험")).toBeVisible();
+    await expect(page.getByText("예상 연간 합계")).toBeVisible();
+    await expect(page.getByText("-1,819,000원")).toBeVisible();
   });
 
   test("정기 정의를 삭제하면 정의와 대기 회차가 사라진다", async ({ page, appUser }) => {

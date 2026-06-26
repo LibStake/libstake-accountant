@@ -27,6 +27,11 @@ import {
   ToggleGroupItem,
 } from "@/components/ui/toggle-group";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -57,15 +62,117 @@ const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 const pad = (n: number) => String(n).padStart(2, "0");
 const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
 
-// 주기별 연간 도래 횟수. 예상 지출은 연간 합을 구해 뷰별로 환산한다.
+// 주기별 연간 도래 횟수. 예상 결제는 연간 합을 구해 기간으로 환산한다.
 const ANNUAL_COUNT: Record<Freq, number> = {
   daily: 365,
   weekly: 52,
   monthly: 12,
   yearly: 1,
 };
-const VIEW_LABEL = { week: "주간", month: "월간", year: "연간" } as const;
-type RecurView = keyof typeof VIEW_LABEL;
+
+// 모두는 다음 도래일순, 나머지는 그 주기로 필터해 윈도 내 시간순으로 본다.
+const TABS = [
+  { value: "all", label: "모두" },
+  { value: "week", label: "주간" },
+  { value: "month", label: "월간" },
+  { value: "year", label: "연간" },
+] as const;
+type RecurView = (typeof TABS)[number]["value"];
+
+const VIEW_FREQ: Record<Exclude<RecurView, "all">, Freq> = {
+  week: "weekly",
+  month: "monthly",
+  year: "yearly",
+};
+
+// 윈도 내 정렬 키: 주간=요일, 월간=일, 연간=월·일, 시각으로 동률 정리.
+function windowKey(d: RecurringDef): number {
+  const t = d.hour * 100 + d.minute;
+  if (d.freq === "weekly") return d.weekday * 10000 + t;
+  if (d.freq === "monthly") return d.day * 10000 + t;
+  if (d.freq === "yearly") return d.month * 1000000 + d.day * 10000 + t;
+  return t;
+}
+
+const signed = (n: number) => `${n > 0 ? "+" : ""}${n.toLocaleString("ko-KR")}원`;
+
+// 정기 항목들을 환산계수로 곱해 수입·지출·순액으로 분해한다.
+type Balance = { income: number; expense: number; net: number };
+function balanceOf(
+  defs: RecurringDef[],
+  factorOf: (d: RecurringDef) => number,
+): Balance {
+  let income = 0;
+  let expense = 0;
+  for (const d of defs) {
+    const v = Math.round(d.amount * factorOf(d));
+    if (d.type === "income") income += v;
+    else expense += v;
+  }
+  return { income, expense, net: income - expense };
+}
+
+function AmountLine({
+  label,
+  value,
+  bold,
+}: {
+  label: string;
+  value: number;
+  bold?: boolean;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-4">
+      <span className={cn("text-muted-foreground", bold && "font-medium text-foreground")}>
+        {label}
+      </span>
+      <span
+        className={cn(
+          "tabular-nums",
+          bold && "font-semibold",
+          value < 0 ? "text-destructive" : "text-foreground",
+        )}
+      >
+        {signed(value)}
+      </span>
+    </div>
+  );
+}
+
+// 라벨·순액을 누르면 팝오버로 수입·지출·합계 분해를 연다.
+function BalanceItem({ label, data }: { label: string; data: Balance }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-baseline justify-between gap-2 text-left"
+        >
+          <span className="text-sm text-muted-foreground underline decoration-dotted underline-offset-4">
+            {label}
+          </span>
+          <span
+            className={cn(
+              "text-lg font-semibold tabular-nums",
+              data.net < 0 ? "text-destructive" : "text-foreground",
+            )}
+          >
+            {signed(data.net)}
+          </span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-56">
+        <div className="flex flex-col gap-2 text-sm">
+          <AmountLine label="수입" value={data.income} />
+          <AmountLine label="지출" value={-data.expense} />
+          <div className="border-t pt-2">
+            <AmountLine label="합계" value={data.net} bold />
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 function describe(d: RecurringDef): string {
   const t = `${pad(d.hour)}:${pad(d.minute)}`;
@@ -114,7 +221,7 @@ export function RecurringView({
   payments: Opt[];
 }) {
   const [adding, setAdding] = useState(false);
-  const [view, setView] = useState<RecurView>("month");
+  const [view, setView] = useState<RecurView>("all");
 
   const [optimisticPending, removePending] = useOptimistic(
     pending,
@@ -139,27 +246,24 @@ export function RecurringView({
     await deleteRecurring(formData);
   }
 
-  // 도래가 임박한 순(오름차). 최신 도래가 리스트 최하단에 온다.
-  const sortedDefs = [...optimisticDefs].sort((a, b) =>
-    a.nextAt.localeCompare(b.nextAt),
-  );
-
-  const annualExpense = optimisticDefs
-    .filter((d) => d.type === "expense")
-    .reduce((sum, d) => sum + d.amount * ANNUAL_COUNT[d.freq], 0);
-  const projected =
-    view === "year"
-      ? annualExpense
-      : view === "month"
-        ? Math.round(annualExpense / 12)
-        : Math.round(annualExpense / 52);
+  // 모두는 다음 도래일순, 나머지는 그 주기로 필터해 윈도 내 시간순으로 본다.
+  const freq = view === "all" ? null : VIEW_FREQ[view];
+  const listDefs =
+    freq === null
+      ? [...optimisticDefs].sort((a, b) => a.nextAt.localeCompare(b.nextAt))
+      : optimisticDefs
+          .filter((d) => d.freq === freq)
+          .sort((a, b) => windowKey(a) - windowKey(b));
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  // 뷰·탭 진입과 추가 폼 열림 시 최하단으로 내린다.
+  const formRef = useRef<HTMLDivElement>(null);
+  // 탭 전환 시 맨 위로, 추가 폼을 열면 폼 상단이 보이게 맞춘다.
   useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [view, adding]);
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [view]);
+  useEffect(() => {
+    if (adding) formRef.current?.scrollIntoView({ block: "start" });
+  }, [adding]);
 
   return (
     <div className="mx-auto flex h-full w-full max-w-md flex-col">
@@ -173,13 +277,13 @@ export function RecurringView({
           spacing={0}
           className="w-full"
         >
-          {(Object.keys(VIEW_LABEL) as RecurView[]).map((v) => (
+          {TABS.map((t) => (
             <ToggleGroupItem
-              key={v}
-              value={v}
+              key={t.value}
+              value={t.value}
               className="flex-1 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
             >
-              {VIEW_LABEL[v]}
+              {t.label}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
@@ -230,11 +334,15 @@ export function RecurringView({
 
         <section className="flex flex-col gap-3">
           <h2 className="font-medium">등록된 정기 거래</h2>
-          {sortedDefs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">등록된 정기 거래가 없어요.</p>
+          {listDefs.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {view === "all"
+                ? "등록된 정기 거래가 없어요."
+                : "이 주기의 정기 거래가 없어요."}
+            </p>
           ) : (
             <ul className="flex flex-col gap-2">
-              {sortedDefs.map((d) => (
+              {listDefs.map((d) => (
                 <DefRow
                   key={d.id}
                   def={d}
@@ -246,12 +354,14 @@ export function RecurringView({
             </ul>
           )}
           {adding && (
-            <DefForm
-              action={createRecurring}
-              categories={categories}
-              payments={payments}
-              onDone={() => setAdding(false)}
-            />
+            <div ref={formRef}>
+              <DefForm
+                action={createRecurring}
+                categories={categories}
+                payments={payments}
+                onDone={() => setAdding(false)}
+              />
+            </div>
           )}
         </section>
       </div>
@@ -262,12 +372,48 @@ export function RecurringView({
             정기 거래 추가
           </Button>
         )}
-        <div className="flex items-baseline justify-between">
-          <span className="text-sm text-muted-foreground">
-            예상 {VIEW_LABEL[view]} 지출
-          </span>
-          <span className="text-lg font-semibold tabular-nums">{won(projected)}</span>
-        </div>
+        {view === "week" && (
+          <BalanceItem
+            label="주간 합계"
+            data={balanceOf(
+              optimisticDefs.filter((d) => d.freq === "weekly"),
+              () => 1,
+            )}
+          />
+        )}
+        {view === "month" && (
+          <>
+            <BalanceItem
+              label="월간 합계"
+              data={balanceOf(
+                optimisticDefs.filter((d) => d.freq === "monthly"),
+                () => 1,
+              )}
+            />
+            <BalanceItem
+              label="예상 월간 합계"
+              data={balanceOf(
+                optimisticDefs.filter((d) => ANNUAL_COUNT[d.freq] >= 12),
+                (d) => ANNUAL_COUNT[d.freq] / 12,
+              )}
+            />
+          </>
+        )}
+        {view === "year" && (
+          <>
+            <BalanceItem
+              label="연간 합계"
+              data={balanceOf(
+                optimisticDefs.filter((d) => d.freq === "yearly"),
+                () => 1,
+              )}
+            />
+            <BalanceItem
+              label="예상 연간 합계"
+              data={balanceOf(optimisticDefs, (d) => ANNUAL_COUNT[d.freq])}
+            />
+          </>
+        )}
       </div>
     </div>
   );
