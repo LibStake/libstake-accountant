@@ -6,12 +6,14 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const HORIZON_DAYS = 62;
 
 // 펼친 정기 거래 한 회차. amount는 양수, 부호는 type으로 가린다.
+// need: 이 회차 진입 시점에 '다음 수입까지' 메워야 할 지출 합(수입 회차는 0).
 export type LiquidityFlow = {
   at: Date;
   amount: number;
   type: TxType;
   name: string;
   defId: string;
+  need: number;
 };
 
 export type LiquidityResult = {
@@ -31,10 +33,29 @@ export function projectLiquidity(defs: RecurringDef[], now: Date): LiquidityResu
   const flows: LiquidityFlow[] = [];
   for (const d of defs) {
     for (const at of enumerateOccurrences(d, now, horizonEnd)) {
-      flows.push({ at, amount: d.amount, type: d.type, name: d.name, defId: d.id });
+      flows.push({
+        at,
+        amount: d.amount,
+        type: d.type,
+        name: d.name,
+        defId: d.id,
+        need: 0,
+      });
     }
   }
   flows.sort((a, b) => a.at.getTime() - b.at.getTime());
+
+  // 뒤에서부터: 각 회차 진입 시 다음 수입까지 메워야 할 지출 합을 채운다.
+  let pendingExpense = 0;
+  for (let i = flows.length - 1; i >= 0; i--) {
+    if (flows[i].type === "income") {
+      pendingExpense = 0;
+      flows[i].need = 0;
+    } else {
+      pendingExpense += flows[i].amount;
+      flows[i].need = pendingExpense;
+    }
+  }
 
   let cum = 0; // 누적 현금흐름(수입 +, 지출 -)
   let minCum = 0; // 지금까지 최저 누적(0 이하)

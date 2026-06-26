@@ -77,7 +77,14 @@ export function LiquidityView({
 
   // 같은 날짜의 흐름을 한 덩어리로 묶는다. before=그날 시작 시 필요 금액, run=마무리 후.
   const groups = timeline.reduce<
-    { key: string; date: Date; items: typeof timeline; before: number; run: number }[]
+    {
+      key: string;
+      date: Date;
+      items: typeof timeline;
+      before: number;
+      run: number;
+      need: number;
+    }[]
   >((acc, f) => {
     const key = kstDayKey(f.at);
     const last = acc[acc.length - 1];
@@ -85,12 +92,18 @@ export function LiquidityView({
       return [...acc.slice(0, -1), { ...last, items: [...last.items, f], run: f.run }];
     }
     const before = last ? last.run : required;
-    return [...acc, { key, date: f.at, items: [f], before, run: f.run }];
+    return [...acc, { key, date: f.at, items: [f], before, run: f.run, need: f.need }];
   }, []);
 
   const criticalKey = hasIncome && criticalAt ? kstDayKey(criticalAt) : null;
-  // 필요 금액은 회복 시점까지만 의미가 있다(그 뒤는 그냥 남는 돈).
-  const recoveredTime = recoveredAt?.getTime() ?? null;
+
+  // 모든 상태 도움말이 공유하는 계산 기준 안내.
+  const calcNote = (
+    <p>
+      현재 정기 지출 항목을 기준으로 계산해요. 가계부에 그때그때 적는 일반 지출이나, 지출 대기
+      중·취소된 정기 거래 회차는 포함하지 않아요.
+    </p>
+  );
 
   return (
     <div className={container}>
@@ -100,7 +113,16 @@ export function LiquidityView({
         <Card>
           <CardContent className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
-              <p className="text-sm font-medium">정기 수입을 등록해 주세요</p>
+              <div className="flex items-center gap-1">
+                <p className="text-sm font-medium">정기 수입을 등록해 주세요</p>
+                <HelpPopover>
+                  <p>
+                    다음 수입까지 필요한 금액은 정기 수입(월급 등)을 알아야 계산할 수 있어요.
+                    지금은 정기 수입이 없어 계산할 수 없어요.
+                  </p>
+                  {calcNote}
+                </HelpPopover>
+              </div>
               <p className="text-xs text-muted-foreground">
                 다음 수입까지 필요한 금액은 정기 수입(월급 등)을 알아야 계산할 수 있어요. 지금은
                 지출만 등록돼 있어요.
@@ -114,9 +136,18 @@ export function LiquidityView({
       ) : structuralDeficit ? (
         <Card>
           <CardContent className="flex flex-col gap-1">
-            <p className="text-sm font-medium text-destructive">
-              정기 수입이 지출을 못 따라가요
-            </p>
+            <div className="flex items-center gap-1">
+              <p className="text-sm font-medium text-destructive">
+                정기 수입이 지출을 못 따라가요
+              </p>
+              <HelpPopover>
+                <p>
+                  등록된 정기 수입이 정기 지출을 따라가지 못해요. 이 구간 안에서는 수입만으로
+                  정기 지출을 메울 수 없어요.
+                </p>
+                {calcNote}
+              </HelpPopover>
+            </div>
             <p className="text-xs text-muted-foreground">
               들어오는 정기 수입보다 나가는 정기 지출이 많아요.
               {criticalAt ? ` 가장 위험한 날은 ${kstDate(criticalAt)}.` : ""}
@@ -126,7 +157,16 @@ export function LiquidityView({
       ) : required === 0 ? (
         <Card>
           <CardContent>
-            <p className="text-sm">앞으로 두 달간 정기 지출로 인한 부족 위험이 없어요.</p>
+            <div className="flex items-center gap-1">
+              <p className="text-sm">앞으로 두 달간 정기 지출로 인한 부족 위험이 없어요.</p>
+              <HelpPopover>
+                <p>
+                  다음 수입까지 등록된 정기 지출을 처리하는 데 따로 현금을 들고 있지 않아도 돼요.
+                  정기 수입이 정기 지출을 덮어요.
+                </p>
+                {calcNote}
+              </HelpPopover>
+            </div>
           </CardContent>
         </Card>
       ) : (
@@ -139,16 +179,9 @@ export function LiquidityView({
               <HelpPopover>
                 <p>
                   다음 수입이 들어올 때까지 등록된 정기 지출을 문제없이 처리하는 데 필요한 최소
-                  현금이에요.
+                  현금이에요. 평소 쓸 돈은 따로 두고, 이 금액만큼은 현금으로 들고 있어야 해요.
                 </p>
-                <p>
-                  가계부에 그때그때 적는 일반 지출은 포함하지 않아요. 평소 쓸 돈은 따로 두고, 이
-                  금액만큼은 현금으로 들고 있어야 해요.
-                </p>
-                <p>
-                  현재 정기 지출 항목을 기준으로 계산해요. 지출 대기 중이거나 취소된 정기 거래
-                  회차는 포함하지 않아요.
-                </p>
+                {calcNote}
               </HelpPopover>
             </div>
             <p className="text-3xl font-semibold tabular-nums">{won(required)}</p>
@@ -204,15 +237,13 @@ export function LiquidityView({
                           </span>
                         )}
                       </span>
-                      {required > 0 &&
-                        hasIncome &&
-                        (recoveredTime === null || g.date.getTime() <= recoveredTime) && (
-                          <span
-                            className={`text-xs tabular-nums ${danger ? "font-medium text-destructive" : "text-muted-foreground"}`}
-                          >
-                            필요 금액 {won(g.before)}
-                          </span>
-                        )}
+                      {hasIncome && (
+                        <span
+                          className={`text-xs tabular-nums ${danger ? "font-medium text-destructive" : "text-muted-foreground"}`}
+                        >
+                          필요 금액 {won(g.need)}
+                        </span>
+                      )}
                     </div>
                     <ul className="flex flex-col gap-1 border-l-2 border-muted pl-3">
                       {g.items.map((f, i) => (
