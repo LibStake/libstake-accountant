@@ -38,30 +38,32 @@ export function projectLiquidity(defs: RecurringDef[], now: Date): LiquidityResu
 
   let cum = 0; // 누적 현금흐름(수입 +, 지출 -)
   let minCum = 0; // 지금까지 최저 누적(0 이하)
-  let criticalAt: Date | null = null;
+  let criticalIdx = -1; // 가장 깊은 골의 회차 인덱스
   let lastBelowZeroIdx = -1;
 
   flows.forEach((f, i) => {
     cum += f.type === "income" ? f.amount : -f.amount;
     if (cum < minCum) {
       minCum = cum;
-      criticalAt = f.at;
+      criticalIdx = i;
     }
     if (cum < 0) lastBelowZeroIdx = i;
   });
 
   const required = minCum < 0 ? -minCum : 0;
+  const criticalAt = required > 0 && criticalIdx >= 0 ? flows[criticalIdx].at : null;
   const structuralDeficit = required > 0 && lastBelowZeroIdx === flows.length - 1;
+  // 가장 위험한 날을 넘기게 해주는 첫 수입 = 고비를 넘는 시점.
   const recoveredAt =
     required === 0
       ? now
       : structuralDeficit
         ? null
-        : flows[lastBelowZeroIdx + 1].at;
+        : (flows.find((f, i) => f.type === "income" && i > criticalIdx)?.at ?? null);
 
   return {
     required,
-    criticalAt: required > 0 ? criticalAt : null,
+    criticalAt,
     recoveredAt,
     structuralDeficit,
     flows,

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { LiquidityResult } from "@/lib/liquidity/project";
+import { HelpPopover } from "./HelpPopover";
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
@@ -18,16 +19,23 @@ function kstDayKey(d: Date): string {
   return `${k.getUTCFullYear()}-${k.getUTCMonth()}-${k.getUTCDate()}`;
 }
 
+function kstYmd(d: Date): string {
+  const k = new Date(d.getTime() + KST_OFFSET_MS);
+  return `${k.getUTCFullYear()}년 ${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일`;
+}
+
 const container = "mx-auto flex w-full max-w-md flex-col gap-6 px-6 py-8";
 
 export function LiquidityView({
   result,
   hasDefs,
   hasIncome,
+  now,
 }: {
   result: LiquidityResult;
   hasDefs: boolean;
   hasIncome: boolean;
+  now: Date;
 }) {
   const { required, criticalAt, recoveredAt, structuralDeficit, flows } = result;
 
@@ -57,19 +65,22 @@ export function LiquidityView({
       .reduce((acc, g) => acc + (g.type === "income" ? g.amount : -g.amount), required),
   }));
 
-  // 같은 날짜의 흐름을 한 덩어리로 묶는다. 잔여는 그날 마지막 흐름 기준.
+  // 같은 날짜의 흐름을 한 덩어리로 묶는다. before=그날 시작 시 필요 금액, run=마무리 후.
   const groups = timeline.reduce<
-    { key: string; date: Date; items: typeof timeline; run: number }[]
+    { key: string; date: Date; items: typeof timeline; before: number; run: number }[]
   >((acc, f) => {
     const key = kstDayKey(f.at);
     const last = acc[acc.length - 1];
     if (last && last.key === key) {
       return [...acc.slice(0, -1), { ...last, items: [...last.items, f], run: f.run }];
     }
-    return [...acc, { key, date: f.at, items: [f], run: f.run }];
+    const before = last ? last.run : required;
+    return [...acc, { key, date: f.at, items: [f], before, run: f.run }];
   }, []);
 
   const criticalKey = hasIncome && criticalAt ? kstDayKey(criticalAt) : null;
+  // 필요 금액은 회복 시점까지만 의미가 있다(그 뒤는 그냥 남는 돈).
+  const recoveredTime = recoveredAt?.getTime() ?? null;
 
   return (
     <div className={container}>
@@ -111,7 +122,25 @@ export function LiquidityView({
       ) : (
         <Card>
           <CardContent className="flex flex-col gap-2">
-            <p className="text-xs text-muted-foreground">지금 필요한 최소 보유액</p>
+            <div className="flex items-center gap-1">
+              <p className="text-xs text-muted-foreground">
+                {kstYmd(now)} 현재 최소 필요 보유액
+              </p>
+              <HelpPopover>
+                <p>
+                  다음 수입이 들어올 때까지 등록된 정기 지출을 문제없이 처리하는 데 필요한 최소
+                  현금이에요.
+                </p>
+                <p>
+                  가계부에 그때그때 적는 일반 지출은 포함하지 않아요. 평소 쓸 돈은 따로 두고, 이
+                  금액만큼은 현금으로 들고 있어야 해요.
+                </p>
+                <p>
+                  현재 정기 지출 항목을 기준으로 계산해요. 지출 대기 중이거나 취소된 정기 거래
+                  회차는 포함하지 않아요.
+                </p>
+              </HelpPopover>
+            </div>
             <p className="text-3xl font-semibold tabular-nums">{won(required)}</p>
             <p className="text-sm text-muted-foreground">
               가장 위험한 날{" "}
@@ -149,13 +178,15 @@ export function LiquidityView({
                         </span>
                       )}
                     </span>
-                    {hasIncome && (
-                      <span
-                        className={`text-xs tabular-nums ${danger ? "font-medium text-destructive" : "text-muted-foreground"}`}
-                      >
-                        잔여 {won(g.run)}
-                      </span>
-                    )}
+                    {required > 0 &&
+                      hasIncome &&
+                      (recoveredTime === null || g.date.getTime() <= recoveredTime) && (
+                        <span
+                          className={`text-xs tabular-nums ${danger ? "font-medium text-destructive" : "text-muted-foreground"}`}
+                        >
+                          필요 금액 {won(g.before)}
+                        </span>
+                      )}
                   </div>
                   <ul className="flex flex-col gap-1 border-l-2 border-muted pl-3">
                     {g.items.map((f, i) => (
