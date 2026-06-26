@@ -5,7 +5,6 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import {
   ToggleGroup,
   ToggleGroupItem,
@@ -128,16 +127,6 @@ export function SummaryView({
           ))}
         </ul>
       )}
-
-      <Separator />
-      <nav className="flex flex-col gap-2">
-        <Button asChild variant="outline" className="h-auto w-full justify-start py-3">
-          <Link href="/settings">관리 (카테고리 · 결제수단)</Link>
-        </Button>
-        <Button asChild variant="outline" className="h-auto w-full justify-start py-3">
-          <Link href="/account">계정 · 보안</Link>
-        </Button>
-      </nav>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 export type TxType = "expense" | "income";
-export type PaymentKind = "card" | "account";
+export type PaymentKind = "card" | "account" | "pay";
 export type TxSource = "manual" | "recurring";
 
 export type Category = { id: string; name: string; order: number };

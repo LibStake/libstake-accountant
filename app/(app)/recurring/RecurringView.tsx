@@ -30,6 +30,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { AmountInput } from "@/components/form/AmountInput";
 import { FormSelect } from "@/components/form/FormSelect";
 import {
   approveOccurrence,
@@ -337,9 +338,8 @@ function DefForm({
         </ToggleGroupItem>
       </ToggleGroup>
 
-      <Input
+      <AmountInput
         name="amount"
-        inputMode="numeric"
         defaultValue={initial ? String(initial.amount) : ""}
         placeholder="금액"
         required

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { toKstInputValue } from "@/lib/kst";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@/components/ui/toggle-group";
+import { AmountInput } from "@/components/form/AmountInput";
 import { FormSelect } from "@/components/form/FormSelect";
 import { createTransaction } from "./actions";
 
@@ -25,24 +26,20 @@ export function EntryForm({
   defaultPaymentId: string | null;
 }) {
   const [type, setType] = useState<"expense" | "income">("expense");
-  const [amount, setAmount] = useState("");
   const [name, setName] = useState("");
   const [memo, setMemo] = useState("");
   const [occurredAt, setOccurredAt] = useState("");
   const [resetKey, setResetKey] = useState(0);
-  const amountRef = useRef<HTMLInputElement>(null);
 
   const [state, action, pending] = useActionState(
     async (prev: Parameters<typeof createTransaction>[0], formData: FormData) => {
       const r = await createTransaction(prev, formData);
       if (r.ok) {
-        setAmount("");
         setName("");
         setMemo("");
         setType("expense");
         setOccurredAt(toKstInputValue(new Date()));
         setResetKey((k) => k + 1);
-        amountRef.current?.focus();
         toast.success("저장했어요");
       }
       return r;
@@ -88,23 +85,20 @@ export function EntryForm({
         <Label htmlFor="amount" className="text-muted-foreground">
           금액
         </Label>
-        <Input
-          ref={amountRef}
+        <AmountInput
+          key={`amt-${resetKey}`}
           id="amount"
-          className="h-auto py-3 text-3xl font-semibold tabular-nums md:text-3xl"
           name="amount"
-          inputMode="numeric"
-          pattern="[0-9]*"
+          className="h-auto py-3 text-3xl font-semibold tabular-nums md:text-3xl"
           placeholder="0"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))}
+          autoFocus={resetKey > 0}
           required
         />
         {fieldErr?.amount && <p className="text-sm text-destructive">{fieldErr.amount}</p>}
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="name">지출명</Label>
+        <Label htmlFor="name">항목명</Label>
         <Input
           id="name"
           name="name"

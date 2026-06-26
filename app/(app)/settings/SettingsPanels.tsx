@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useOptimistic, useRef, useState } from "react";
+import Link from "next/link";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import type { PaymentKind } from "@/lib/domain/types";
@@ -50,6 +51,15 @@ type Pay = {
 type VoidAction = (formData: FormData) => void | Promise<void>;
 type MoveAction = { kind: "delete"; id: string } | { kind: "move"; id: string; dir: "up" | "down" };
 
+const PAYMENT_KINDS = [
+  { value: "card", label: "카드" },
+  { value: "account", label: "계좌" },
+  { value: "pay", label: "페이" },
+] satisfies { value: PaymentKind; label: string }[];
+
+const kindLabel = (kind: PaymentKind): string =>
+  PAYMENT_KINDS.find((k) => k.value === kind)?.label ?? kind;
+
 function reorder<T extends { id: string }>(state: T[], a: MoveAction): T[] {
   if (a.kind === "delete") return state.filter((x) => x.id !== a.id);
   const i = state.findIndex((x) => x.id === a.id);
@@ -74,6 +84,9 @@ export function SettingsPanels({
       <h1 className="text-xl font-semibold">관리</h1>
       <CategorySection categories={categories} />
       <PaymentSection payments={payments} defaultPaymentId={defaultPaymentId} />
+      <Button asChild variant="outline" className="h-auto w-full justify-start py-3">
+        <Link href="/account">계정 · 보안</Link>
+      </Button>
     </div>
   );
 }
@@ -324,10 +337,7 @@ function PaymentSection({
             ariaLabel="결제수단 종류"
             defaultValue="card"
             className="w-24"
-            options={[
-              { value: "card", label: "카드" },
-              { value: "account", label: "계좌" },
-            ]}
+            options={PAYMENT_KINDS}
           />
           <Button type="submit" variant="outline" disabled={pending}>
             추가
@@ -387,7 +397,7 @@ function PaymentRow({
             <div className="flex min-w-0 items-center gap-2">
               <span className="truncate">{pay.name}</span>
               <span className="text-xs text-muted-foreground">
-                {pay.kind === "card" ? "카드" : "계좌"}
+                {kindLabel(pay.kind)}
               </span>
               {isDefault && <Badge>기본</Badge>}
               {pay.archived && <Badge variant="secondary">보관됨</Badge>}

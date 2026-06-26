@@ -17,6 +17,19 @@ test.describe("설정 · 결제수단", () => {
       .toBe("account");
   });
 
+  test("결제수단을 페이로 추가하면 kind=pay로 저장된다", async ({ page, appUser }) => {
+    await page.goto("/settings");
+    const payForm = page.locator("form").filter({ has: page.getByPlaceholder("새 결제수단") });
+    await payForm.getByPlaceholder("새 결제수단").fill("네이버페이");
+    await selectOption(payForm, "결제수단 종류", "페이");
+    await payForm.getByRole("button", { name: "추가" }).click();
+
+    await expect(page.getByText("추가했어요")).toBeVisible();
+    await expect
+      .poll(async () => (await listPayments(appUser.uid)).find((p) => p.name === "네이버페이")?.kind)
+      .toBe("pay");
+  });
+
   test("기본으로 지정하면 사용자 문서에 반영된다", async ({ page, appUser }) => {
     const payId = await seedPayment(appUser.uid, "신한카드", { order: 0 });
 
@@ -44,7 +57,8 @@ test.describe("설정 · 결제수단", () => {
     await expect
       .poll(async () => (await listPayments(appUser.uid)).find((p) => p.id === payId)?.archived)
       .toBe(true);
-    expect(await getDefaultPaymentId(appUser.uid)).toBeNull();
+    // 보관은 archived 기록 뒤 기본 지정을 푸는 두 쓰기라 기본 해제는 폴링으로 기다린다.
+    await expect.poll(async () => await getDefaultPaymentId(appUser.uid)).toBeNull();
   });
 
   test("결제수단을 삭제하면 사용 거래의 결제수단이 비워진다", async ({ page, appUser }) => {

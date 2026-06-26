@@ -1,6 +1,6 @@
 # 요약 화면
 
-> 월간 집계 회고와 관리 진입. 집계 정의는 [`service-specs/transactions.md`](../service-specs/transactions.md).
+> 월간 집계 회고. 집계 정의는 [`service-specs/transactions.md`](../service-specs/transactions.md).
 
 ## 목적
 
@@ -11,12 +11,10 @@
 - 상단: 그 달 총지출·총수입(요점 먼저).
 - 카테고리별 합계 — 큰 순으로.
 - 월 선택(기본=이번 달).
-- **관리·계정** 진입(카테고리·결제수단은 [`settings.md`](./settings.md), 계정·보안은 [`account.md`](./account.md)).
 
 ## 흐름
 
 - 월 이동으로 다른 달을 회고.
-- 관리로 들어가 분류·결제수단을 정리한다.
 
 ## 폼팩터
 

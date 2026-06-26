@@ -8,5 +8,5 @@
 | [`auth.md`](./auth.md) | 가입·로그인·잠금해제·계정/기기 관리를 다룰 때 |
 | [`transactions.md`](./transactions.md) | 거래 입력·내역·월간 요약을 다룰 때 |
 | [`categories.md`](./categories.md) | 카테고리(분류)를 다룰 때 |
-| [`payment-methods.md`](./payment-methods.md) | 결제수단(카드/계좌)을 다룰 때 |
+| [`payment-methods.md`](./payment-methods.md) | 결제수단(카드·계좌·페이)을 다룰 때 |
 | [`recurring.md`](./recurring.md) | 정기 거래와 도래 처리를 다룰 때 |

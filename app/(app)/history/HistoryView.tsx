@@ -26,6 +26,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { AmountInput } from "@/components/form/AmountInput";
 import { FormSelect } from "@/components/form/FormSelect";
 import { deleteTransaction, updateTransaction } from "./actions";
 
@@ -112,7 +113,7 @@ export function HistoryView({
       </div>
 
       <Input
-        placeholder="지출명 검색"
+        placeholder="항목명 검색"
         value={q}
         onChange={(e) => setQ(e.target.value)}
       />
@@ -225,10 +226,10 @@ function Row({
                 { value: "income", label: "수입" },
               ]}
             />
-            <Input
+            <AmountInput
               name="amount"
               defaultValue={String(tx.amount)}
-              inputMode="numeric"
+              aria-label="금액"
               className="flex-1"
               required
             />

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PencilLine, PieChart, ReceiptText, Repeat } from "lucide-react";
+import { PencilLine, PieChart, ReceiptText, Repeat, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
@@ -11,10 +11,14 @@ const TABS = [
   { href: "/history", label: "내역", icon: ReceiptText },
   { href: "/recurring", label: "정기", icon: Repeat },
   { href: "/summary", label: "요약", icon: PieChart },
+  { href: "/settings", label: "관리", icon: Settings },
 ] as const;
 
 function isActive(pathname: string, href: string): boolean {
-  return href === "/" ? pathname === "/" : pathname.startsWith(href);
+  if (href === "/") return pathname === "/";
+  // 계정·보안은 관리에서 진입하는 하위 화면이라 관리 탭을 활성으로 둔다.
+  if (href === "/settings") return pathname.startsWith("/settings") || pathname.startsWith("/account");
+  return pathname.startsWith(href);
 }
 
 function CountBadge({ n, className }: { n: number; className?: string }) {
@@ -61,7 +65,7 @@ export function TopNav({ pendingCount }: { pendingCount: number }) {
 export function BottomNav({ pendingCount }: { pendingCount: number }) {
   const pathname = usePathname();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-10 grid grid-cols-4 border-t bg-background sm:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-10 grid grid-cols-5 border-t bg-background sm:hidden">
       {TABS.map((t) => {
         const active = isActive(pathname, t.href);
         const Icon = t.icon;

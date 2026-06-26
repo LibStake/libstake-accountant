@@ -8,7 +8,7 @@ test.describe("거래 생성", () => {
     await page.goto("/");
 
     await page.getByLabel("금액").fill("15000");
-    await page.getByLabel("지출명").fill("점심");
+    await page.getByLabel("항목명").fill("점심");
     await selectOption(page, "카테고리", "식비");
     await page.getByLabel("메모 (선택)").fill("회사 근처");
     await page.getByRole("button", { name: "저장" }).click();
@@ -27,11 +27,26 @@ test.describe("거래 생성", () => {
     expect(Math.abs(tx.occurredAt.getTime() - Date.now())).toBeLessThan(5 * 60_000);
   });
 
+  test("금액은 세 자리마다 콤마로 보이고 정수로 저장된다", async ({ page, appUser }) => {
+    await page.goto("/");
+
+    await page.getByLabel("금액").fill("1234567");
+    await expect(page.getByLabel("금액")).toHaveValue("1,234,567");
+    await page.getByLabel("항목명").fill("노트북");
+    await page.getByRole("button", { name: "저장" }).click();
+
+    await expectToast(page, "저장했어요");
+
+    await expect.poll(async () => (await listTransactions(appUser.uid)).length).toBe(1);
+    const [tx] = await listTransactions(appUser.uid);
+    expect(tx.amount).toBe(1234567);
+  });
+
   test("미분류·없음이면 categoryId/paymentMethodId가 null로 저장된다", async ({ page, appUser }) => {
     await page.goto("/");
 
     await page.getByLabel("금액").fill("3000");
-    await page.getByLabel("지출명").fill("미분류 지출");
+    await page.getByLabel("항목명").fill("미분류 지출");
     await page.getByRole("button", { name: "저장" }).click();
 
     await expectToast(page, "저장했어요");
@@ -47,7 +62,7 @@ test.describe("거래 생성", () => {
 
     await page.getByRole("radio", { name: "수입" }).click();
     await page.getByLabel("금액").fill("2000000");
-    await page.getByLabel("지출명").fill("월급");
+    await page.getByLabel("항목명").fill("월급");
     await page.getByRole("button", { name: "저장" }).click();
 
     await expectToast(page, "저장했어요");
@@ -64,7 +79,7 @@ test.describe("거래 생성", () => {
 
     await page.goto("/");
     await page.getByLabel("금액").fill("8000");
-    await page.getByLabel("지출명").fill("택시");
+    await page.getByLabel("항목명").fill("택시");
     await page.getByRole("button", { name: "저장" }).click();
 
     await expectToast(page, "저장했어요");

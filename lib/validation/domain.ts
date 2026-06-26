@@ -9,7 +9,7 @@ const optionalId = z
   .transform((v) => (v ? v : null));
 
 export const txInput = z.object({
-  name: z.string().trim().min(1, "지출명을 입력해주세요.").max(100),
+  name: z.string().trim().min(1, "항목명을 입력해주세요.").max(100),
   amount: z.coerce
     .number()
     .int("금액은 정수로 입력해주세요.")
@@ -33,7 +33,7 @@ export const categoryInput = z.object({
 
 export const paymentInput = z.object({
   name: z.string().trim().min(1, "이름을 입력해주세요.").max(40),
-  kind: z.enum(["card", "account"]),
+  kind: z.enum(["card", "account", "pay"]),
 });
 
 export const recurringInput = z.object({

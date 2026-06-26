@@ -15,7 +15,7 @@ test.describe("거래 수정·삭제", () => {
 
     await page.goto("/history");
     await page.getByRole("button", { name: "수정" }).click();
-    await page.locator('input[name="amount"]').fill("9999");
+    await page.getByLabel("금액").fill("9999");
     await page.locator('input[name="name"]').fill("수정후");
     await selectOption(page, "카테고리", "식비");
     await page.getByRole("button", { name: "저장" }).click();
