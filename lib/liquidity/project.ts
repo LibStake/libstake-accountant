@@ -14,19 +14,11 @@ export type LiquidityFlow = {
   defId: string;
 };
 
-// "이 날까지 버티려면 required가 있어야 한다" — 필요액이 늘어나는 지점.
-export type LiquidityCheckpoint = {
-  at: Date;
-  required: number;
-  name: string;
-};
-
 export type LiquidityResult = {
   required: number; // 가장 깊은 골의 크기(>=0)
   criticalAt: Date | null; // 가장 위험한 날(required>0)
   recoveredAt: Date | null; // 회복 시점(구조적 적자면 null)
   structuralDeficit: boolean;
-  checkpoints: LiquidityCheckpoint[];
   flows: LiquidityFlow[];
   horizonEnd: Date;
 };
@@ -48,14 +40,12 @@ export function projectLiquidity(defs: RecurringDef[], now: Date): LiquidityResu
   let minCum = 0; // 지금까지 최저 누적(0 이하)
   let criticalAt: Date | null = null;
   let lastBelowZeroIdx = -1;
-  const checkpoints: LiquidityCheckpoint[] = [];
 
   flows.forEach((f, i) => {
     cum += f.type === "income" ? f.amount : -f.amount;
     if (cum < minCum) {
       minCum = cum;
       criticalAt = f.at;
-      checkpoints.push({ at: f.at, required: -cum, name: f.name });
     }
     if (cum < 0) lastBelowZeroIdx = i;
   });
@@ -74,7 +64,6 @@ export function projectLiquidity(defs: RecurringDef[], now: Date): LiquidityResu
     criticalAt: required > 0 ? criticalAt : null,
     recoveredAt,
     structuralDeficit,
-    checkpoints,
     flows,
     horizonEnd,
   };

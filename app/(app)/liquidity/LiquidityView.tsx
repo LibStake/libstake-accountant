@@ -13,6 +13,11 @@ function kstDate(d: Date): string {
   return `${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일 (${WEEKDAY[k.getUTCDay()]})`;
 }
 
+function kstDayKey(d: Date): string {
+  const k = new Date(d.getTime() + KST_OFFSET_MS);
+  return `${k.getUTCFullYear()}-${k.getUTCMonth()}-${k.getUTCDate()}`;
+}
+
 const container = "mx-auto flex w-full max-w-md flex-col gap-6 px-6 py-8";
 
 export function LiquidityView({
@@ -24,8 +29,7 @@ export function LiquidityView({
   hasDefs: boolean;
   hasIncome: boolean;
 }) {
-  const { required, criticalAt, recoveredAt, structuralDeficit, checkpoints, flows } =
-    result;
+  const { required, criticalAt, recoveredAt, structuralDeficit, flows } = result;
 
   if (!hasDefs) {
     return (
@@ -52,6 +56,20 @@ export function LiquidityView({
       .slice(0, i + 1)
       .reduce((acc, g) => acc + (g.type === "income" ? g.amount : -g.amount), required),
   }));
+
+  // 같은 날짜의 흐름을 한 덩어리로 묶는다. 잔여는 그날 마지막 흐름 기준.
+  const groups = timeline.reduce<
+    { key: string; date: Date; items: typeof timeline; run: number }[]
+  >((acc, f) => {
+    const key = kstDayKey(f.at);
+    const last = acc[acc.length - 1];
+    if (last && last.key === key) {
+      return [...acc.slice(0, -1), { ...last, items: [...last.items, f], run: f.run }];
+    }
+    return [...acc, { key, date: f.at, items: [f], run: f.run }];
+  }, []);
+
+  const criticalKey = hasIncome && criticalAt ? kstDayKey(criticalAt) : null;
 
   return (
     <div className={container}>
@@ -96,70 +114,70 @@ export function LiquidityView({
             <p className="text-xs text-muted-foreground">지금 필요한 최소 보유액</p>
             <p className="text-3xl font-semibold tabular-nums">{won(required)}</p>
             <p className="text-sm text-muted-foreground">
-              가장 위험한 날 {criticalAt ? kstDate(criticalAt) : "-"}
-              {recoveredAt ? ` · ${kstDate(recoveredAt)} 이후 회복` : ""}
+              가장 위험한 날{" "}
+              <span className="font-medium text-destructive">
+                {criticalAt ? kstDate(criticalAt) : "-"}
+              </span>
+              {recoveredAt ? (
+                <>
+                  {" · "}
+                  <span className="font-medium text-emerald-600">{kstDate(recoveredAt)}</span>{" "}
+                  이후 회복
+                </>
+              ) : null}
             </p>
           </CardContent>
         </Card>
       )}
 
-      {hasIncome && checkpoints.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-sm font-medium text-muted-foreground">언제까지 얼마</h2>
-          <ul className="flex flex-col gap-2">
-            {checkpoints.map((c, i) => {
-              const last = i === checkpoints.length - 1;
+      {groups.length > 0 && (
+        <section className="flex flex-col gap-4">
+          <h2 className="text-sm font-medium text-muted-foreground">예정 흐름</h2>
+          <ul className="flex flex-col gap-4">
+            {groups.map((g) => {
+              const danger = criticalKey === g.key;
               return (
-                <li
-                  key={c.at.getTime()}
-                  className="flex items-baseline justify-between gap-2 text-sm"
-                >
-                  <span className="min-w-0 truncate">
-                    {kstDate(c.at)}까지
-                    <span className="ml-1 text-xs text-muted-foreground">{c.name}</span>
-                  </span>
-                  <span
-                    className={`shrink-0 tabular-nums ${last ? "font-semibold" : ""}`}
-                  >
-                    {won(c.required)}
-                  </span>
+                <li key={g.key} className="flex flex-col gap-1.5">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span
+                      className={`text-sm font-semibold ${danger ? "text-destructive" : "text-foreground"}`}
+                    >
+                      {kstDate(g.date)}
+                      {danger && (
+                        <span className="ml-1 text-xs font-normal text-destructive">
+                          가장 위험
+                        </span>
+                      )}
+                    </span>
+                    {hasIncome && (
+                      <span
+                        className={`text-xs tabular-nums ${danger ? "font-medium text-destructive" : "text-muted-foreground"}`}
+                      >
+                        잔여 {won(g.run)}
+                      </span>
+                    )}
+                  </div>
+                  <ul className="flex flex-col gap-1 border-l-2 border-muted pl-3">
+                    {g.items.map((f, i) => (
+                      <li
+                        key={`${f.defId}-${i}`}
+                        className="flex items-baseline justify-between gap-2 text-sm"
+                      >
+                        <span className="min-w-0 truncate text-muted-foreground">
+                          {f.name}
+                        </span>
+                        <span
+                          className={`shrink-0 font-medium tabular-nums ${f.type === "income" ? "text-emerald-600" : "text-destructive"}`}
+                        >
+                          {f.type === "income" ? "+" : "−"}
+                          {won(f.amount)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 </li>
               );
             })}
-          </ul>
-        </section>
-      )}
-
-      {timeline.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-sm font-medium text-muted-foreground">예정 흐름</h2>
-          <ul className="flex flex-col gap-3">
-            {timeline.map((f, i) => (
-              <li
-                key={`${f.defId}-${f.at.getTime()}-${i}`}
-                className="flex items-center justify-between gap-3 text-sm"
-              >
-                <div className="flex min-w-0 flex-col">
-                  <span className="truncate">{f.name}</span>
-                  <span className="text-xs text-muted-foreground">{kstDate(f.at)}</span>
-                </div>
-                <div className="flex shrink-0 flex-col items-end">
-                  <span
-                    className={`tabular-nums ${f.type === "income" ? "text-emerald-600" : "text-muted-foreground"}`}
-                  >
-                    {f.type === "income" ? "+" : "−"}
-                    {won(f.amount)}
-                  </span>
-                  {hasIncome && (
-                    <span
-                      className={`text-xs tabular-nums ${f.run === 0 ? "font-medium text-destructive" : "text-muted-foreground"}`}
-                    >
-                      잔여 {won(f.run)}
-                    </span>
-                  )}
-                </div>
-              </li>
-            ))}
           </ul>
         </section>
       )}
