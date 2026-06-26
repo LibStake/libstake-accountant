@@ -14,7 +14,9 @@ export default async function AppLayout({
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
       <TopNav pendingCount={pendingCount} />
-      <main className="min-h-0 flex-1 overflow-y-auto pb-16 sm:pb-0">{children}</main>
+      <main className="min-h-0 flex-1 overflow-y-auto pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0">
+        {children}
+      </main>
       <BottomNav pendingCount={pendingCount} />
     </div>
   );

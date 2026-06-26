@@ -65,7 +65,7 @@ export function TopNav({ pendingCount }: { pendingCount: number }) {
 export function BottomNav({ pendingCount }: { pendingCount: number }) {
   const pathname = usePathname();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-10 grid grid-cols-5 border-t bg-background sm:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-10 grid grid-cols-5 border-t bg-background pb-[env(safe-area-inset-bottom)] sm:hidden">
       {TABS.map((t) => {
         const active = isActive(pathname, t.href);
         const Icon = t.icon;
