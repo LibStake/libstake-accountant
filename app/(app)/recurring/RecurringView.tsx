@@ -182,6 +182,20 @@ function describe(d: RecurringDef): string {
   return `매년 ${d.month}월 ${d.day}일 ${t}`;
 }
 
+// 일정(주기+결제일시) 동일성 비교용 서명 — 주기에 무관한 필드는 무시한다.
+function scheduleSig(
+  freq: Freq,
+  month: string,
+  day: string,
+  weekday: string,
+  time: string,
+): string {
+  if (freq === "daily") return `daily|${time}`;
+  if (freq === "weekly") return `weekly|${weekday}|${time}`;
+  if (freq === "monthly") return `monthly|${day}|${time}`;
+  return `yearly|${month}|${day}|${time}`;
+}
+
 function Picker({
   value,
   onChange,
@@ -514,6 +528,21 @@ function DefForm({
   const [day, setDay] = useState(String(initial?.day ?? 1));
   const [weekday, setWeekday] = useState(String(initial?.weekday ?? 1));
   const [expiry, setExpiry] = useState<string>(initial?.expiry ?? "skip");
+  const [time, setTime] = useState(
+    initial ? `${pad(initial.hour)}:${pad(initial.minute)}` : "09:00",
+  );
+
+  // 편집 중 일정이 바뀌면 옛 회차·거래가 남는다는 경고를 띄운다.
+  const scheduleChanged =
+    !!initial &&
+    scheduleSig(freq, month, day, weekday, time) !==
+      scheduleSig(
+        initial.freq,
+        String(initial.month),
+        String(initial.day),
+        String(initial.weekday),
+        `${pad(initial.hour)}:${pad(initial.minute)}`,
+      );
 
   useEffect(() => {
     if (state?.ok) {
@@ -642,7 +671,8 @@ function DefForm({
           id="time-input"
           type="time"
           name="time"
-          defaultValue={initial ? `${pad(initial.hour)}:${pad(initial.minute)}` : "09:00"}
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
           required
         />
       </div>
@@ -678,6 +708,14 @@ function DefForm({
           <input type="checkbox" name="reflect" value="1" className="size-4 accent-primary" /> 대기
           회차에도 반영
         </label>
+      )}
+
+      {scheduleChanged && (
+        <p className="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">
+          {initial?.mode === "auto"
+            ? "일정을 바꾸면 이미 추가된 거래는 그대로 남고, 새 일정으로 또 추가될 수 있어요. 내역에서 직접 정리하세요."
+            : "일정을 바꾸면 옛 날짜의 대기 회차는 그대로 남아요. 대기 회차 목록에서 직접 해제하세요."}
+        </p>
       )}
 
       {state && !state.ok && !state.fields && (

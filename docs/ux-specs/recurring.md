@@ -21,7 +21,7 @@
 - 앱 진입 시 밀린 회차가 채워지며 대기 목록이 갱신된다(재조정 시점은 [`service-specs/recurring.md`](../service-specs/recurring.md)).
 - 승인 → 내역에 거래로 추가([`history.md`](./history.md)). 해제 → 그 회차만 건너뜀.
 - 미응답 회차의 만료 처리는 등록 시 정한 옵션을 따른다([`service-specs/recurring.md`](../service-specs/recurring.md)).
-- **수정 시**: 이미 생성된 거래는 그대로 두고, 대기 회차에 반영할지는 확인 다이얼로그로 정한다([`patterns.md`](./patterns.md), 규칙은 [`service-specs/recurring.md`](../service-specs/recurring.md)).
+- **수정 시**: 이미 생성된 거래는 그대로 두고, 대기 회차에 스냅샷을 반영할지는 폼의 확인 항목으로 정한다. 일정(주기·결제일시)을 바꾸면 옛 회차·거래가 그대로 남는다는 경고를 폼 안에 보인다([`patterns.md`](./patterns.md), 규칙은 [`service-specs/recurring.md`](../service-specs/recurring.md)).
 
 ## 디스커버리
 

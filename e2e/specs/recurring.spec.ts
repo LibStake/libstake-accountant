@@ -144,4 +144,20 @@ test.describe("정기 거래", () => {
       .poll(async () => (await getOccurrence(appUser.uid, occId))?.status ?? "gone")
       .toBe("gone");
   });
+
+  test("일정을 바꾸면 옛 회차 경고가 폼에 뜬다", async ({ page, appUser }) => {
+    await seedRecurringDef(appUser.uid, {
+      name: "월세",
+      amount: 500000,
+      freq: "monthly",
+      day: 10,
+      mode: "notify",
+    });
+
+    await page.goto("/recurring");
+    await page.getByRole("button", { name: "수정" }).click();
+    await expect(page.getByText("대기 회차는 그대로 남아요")).toHaveCount(0);
+    await page.getByLabel("일").fill("20");
+    await expect(page.getByText("대기 회차는 그대로 남아요")).toBeVisible();
+  });
 });
