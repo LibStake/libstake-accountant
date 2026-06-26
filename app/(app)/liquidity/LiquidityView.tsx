@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,6 +23,15 @@ function kstDayKey(d: Date): string {
 function kstYmd(d: Date): string {
   const k = new Date(d.getTime() + KST_OFFSET_MS);
   return `${k.getUTCFullYear()}년 ${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일`;
+}
+
+function kstMonthKey(d: Date): string {
+  const k = new Date(d.getTime() + KST_OFFSET_MS);
+  return `${k.getUTCFullYear()}-${k.getUTCMonth()}`;
+}
+
+function kstMonthLabel(d: Date): string {
+  return `${new Date(d.getTime() + KST_OFFSET_MS).getUTCMonth() + 1}월`;
 }
 
 const container = "mx-auto flex w-full max-w-md flex-col gap-6 px-6 py-8";
@@ -163,50 +173,67 @@ export function LiquidityView({
         <section className="flex flex-col gap-4">
           <h2 className="text-sm font-medium text-muted-foreground">예정 흐름</h2>
           <ul className="flex flex-col gap-4">
-            {groups.map((g) => {
+            {groups.map((g, idx) => {
               const danger = criticalKey === g.key;
+              const prev = idx > 0 ? groups[idx - 1] : null;
+              const monthChanged =
+                hasIncome &&
+                prev !== null &&
+                kstMonthKey(g.date) !== kstMonthKey(prev.date);
               return (
-                <li key={g.key} className="flex flex-col gap-1.5">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span
-                      className={`text-sm font-semibold ${danger ? "text-destructive" : "text-foreground"}`}
-                    >
-                      {kstDate(g.date)}
-                      {danger && (
-                        <span className="ml-1 text-xs font-normal text-destructive">
-                          가장 위험
-                        </span>
-                      )}
-                    </span>
-                    {required > 0 &&
-                      hasIncome &&
-                      (recoveredTime === null || g.date.getTime() <= recoveredTime) && (
-                        <span
-                          className={`text-xs tabular-nums ${danger ? "font-medium text-destructive" : "text-muted-foreground"}`}
-                        >
-                          필요 금액 {won(g.before)}
-                        </span>
-                      )}
-                  </div>
-                  <ul className="flex flex-col gap-1 border-l-2 border-muted pl-3">
-                    {g.items.map((f, i) => (
-                      <li
-                        key={`${f.defId}-${i}`}
-                        className="flex items-baseline justify-between gap-2 text-sm"
+                <Fragment key={g.key}>
+                  {monthChanged && (
+                    <li className="flex items-center justify-between gap-2 rounded-md bg-muted/50 px-3 py-2 text-xs">
+                      <span className="text-muted-foreground">
+                        {kstMonthLabel(g.date)} 시작 시점
+                      </span>
+                      <span className="font-medium tabular-nums">
+                        잔액 {won(g.before)}
+                      </span>
+                    </li>
+                  )}
+                  <li className="flex flex-col gap-1.5">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span
+                        className={`text-sm font-semibold ${danger ? "text-destructive" : "text-foreground"}`}
                       >
-                        <span className="min-w-0 truncate text-muted-foreground">
-                          {f.name}
-                        </span>
-                        <span
-                          className={`shrink-0 font-medium tabular-nums ${f.type === "income" ? "text-emerald-600" : "text-destructive"}`}
+                        {kstDate(g.date)}
+                        {danger && (
+                          <span className="ml-1 text-xs font-normal text-destructive">
+                            가장 위험
+                          </span>
+                        )}
+                      </span>
+                      {required > 0 &&
+                        hasIncome &&
+                        (recoveredTime === null || g.date.getTime() <= recoveredTime) && (
+                          <span
+                            className={`text-xs tabular-nums ${danger ? "font-medium text-destructive" : "text-muted-foreground"}`}
+                          >
+                            필요 금액 {won(g.before)}
+                          </span>
+                        )}
+                    </div>
+                    <ul className="flex flex-col gap-1 border-l-2 border-muted pl-3">
+                      {g.items.map((f, i) => (
+                        <li
+                          key={`${f.defId}-${i}`}
+                          className="flex items-baseline justify-between gap-2 text-sm"
                         >
-                          {f.type === "income" ? "+" : "−"}
-                          {won(f.amount)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </li>
+                          <span className="min-w-0 truncate text-muted-foreground">
+                            {f.name}
+                          </span>
+                          <span
+                            className={`shrink-0 font-medium tabular-nums ${f.type === "income" ? "text-emerald-600" : "text-destructive"}`}
+                          >
+                            {f.type === "income" ? "+" : "−"}
+                            {won(f.amount)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                </Fragment>
               );
             })}
           </ul>
