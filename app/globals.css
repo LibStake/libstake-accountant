@@ -127,4 +127,9 @@
   html {
     @apply font-sans;
   }
+  /* iOS Safari는 datetime-local에 고유 최소 너비를 줘 width:100%를 무시하고 컨테이너를 넘는다. 네이티브 외형을 끄면 일반 인풋처럼 폭을 따른다. */
+  input[type="datetime-local"] {
+    -webkit-appearance: none;
+    appearance: none;
+  }
 }
