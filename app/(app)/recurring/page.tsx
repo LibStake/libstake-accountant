@@ -30,6 +30,8 @@ export default async function RecurringPage() {
         name: o.name,
         amount: o.amount,
         type: o.type,
+        categoryId: o.categoryId,
+        paymentMethodId: o.paymentMethodId,
         occurredAt: o.occurredAt.toISOString(),
       }))}
       categories={categories.map((c) => ({ id: c.id, name: c.name }))}

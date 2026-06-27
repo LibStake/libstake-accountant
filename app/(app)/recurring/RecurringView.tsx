@@ -9,7 +9,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { formatKst } from "@/lib/kst";
+import { formatKst, toKstInputValue } from "@/lib/kst";
 import type { Freq, RecurMode, RecurringDef, TxType } from "@/lib/domain/types";
 import type { Result } from "@/lib/server/result";
 import { Button } from "@/components/ui/button";
@@ -46,6 +46,7 @@ import { AmountInput } from "@/components/form/AmountInput";
 import { FormSelect } from "@/components/form/FormSelect";
 import {
   approveOccurrence,
+  approveOccurrenceEdited,
   createRecurring,
   deleteRecurring,
   skipOccurrence,
@@ -54,7 +55,15 @@ import {
 
 type Opt = { id: string; name: string };
 type DefWithNext = RecurringDef & { nextAt: string };
-type Pending = { id: string; name: string; amount: number; type: TxType; occurredAt: string };
+type Pending = {
+  id: string;
+  name: string;
+  amount: number;
+  type: TxType;
+  categoryId: string | null;
+  paymentMethodId: string | null;
+  occurredAt: string;
+};
 type FormAction = (prev: Result<null> | null, fd: FormData) => Promise<Result<null>>;
 type Picks = { value: string; label: string }[];
 
@@ -312,35 +321,14 @@ export function RecurringView({
             <h2 className="font-medium">대기 회차</h2>
             <ul className="flex flex-col gap-2">
               {optimisticPending.map((o) => (
-                <li
+                <PendingRow
                   key={o.id}
-                  className="flex items-center justify-between gap-2 rounded-lg border p-3"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">
-                      {o.name}{" "}
-                      <span className={o.type === "expense" ? "text-destructive" : ""}>
-                        {o.type === "income" ? "+" : "-"}
-                        {won(o.amount)}
-                      </span>
-                    </p>
-                    <p className="text-xs text-muted-foreground">{formatKst(new Date(o.occurredAt))}</p>
-                  </div>
-                  <div className="flex shrink-0 gap-1">
-                    <form action={onApprove}>
-                      <input type="hidden" name="occId" value={o.id} />
-                      <Button type="submit" variant="ghost" size="xs" className="text-emerald-600">
-                        승인
-                      </Button>
-                    </form>
-                    <form action={onSkip}>
-                      <input type="hidden" name="occId" value={o.id} />
-                      <Button type="submit" variant="ghost" size="xs" className="text-muted-foreground">
-                        해제
-                      </Button>
-                    </form>
-                  </div>
-                </li>
+                  occ={o}
+                  categories={categories}
+                  payments={payments}
+                  onApprove={onApprove}
+                  onSkip={onSkip}
+                />
               ))}
             </ul>
           </section>
@@ -430,6 +418,187 @@ export function RecurringView({
         )}
       </div>
     </div>
+  );
+}
+
+function PendingRow({
+  occ,
+  categories,
+  payments,
+  onApprove,
+  onSkip,
+}: {
+  occ: Pending;
+  categories: Opt[];
+  payments: Opt[];
+  onApprove: (formData: FormData) => Promise<void>;
+  onSkip: (formData: FormData) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+
+  if (editing) {
+    return (
+      <li>
+        <ApproveEditForm
+          occ={occ}
+          categories={categories}
+          payments={payments}
+          onDone={() => setEditing(false)}
+        />
+      </li>
+    );
+  }
+
+  return (
+    <li className="flex items-center justify-between gap-2 rounded-lg border p-3">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium">
+          {occ.name}{" "}
+          <span className={occ.type === "expense" ? "text-destructive" : ""}>
+            {occ.type === "income" ? "+" : "-"}
+            {won(occ.amount)}
+          </span>
+        </p>
+        <p className="text-xs text-muted-foreground">{formatKst(new Date(occ.occurredAt))}</p>
+      </div>
+      <div className="flex shrink-0 gap-1">
+        <form action={onApprove}>
+          <input type="hidden" name="occId" value={occ.id} />
+          <Button type="submit" variant="ghost" size="xs" className="text-emerald-600">
+            승인
+          </Button>
+        </form>
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          onClick={() => setEditing(true)}
+        >
+          수정 후 승인
+        </Button>
+        <form action={onSkip}>
+          <input type="hidden" name="occId" value={occ.id} />
+          <Button type="submit" variant="ghost" size="xs" className="text-muted-foreground">
+            해제
+          </Button>
+        </form>
+      </div>
+    </li>
+  );
+}
+
+// 회차 값을 채운 거래 폼. 승인 시에만 그 값으로 거래가 만들어지고, 취소는 아무것도 저장하지 않는다.
+function ApproveEditForm({
+  occ,
+  categories,
+  payments,
+  onDone,
+}: {
+  occ: Pending;
+  categories: Opt[];
+  payments: Opt[];
+  onDone: () => void;
+}) {
+  // 성공 시 회차가 목록에서 빠지며 이 폼이 언마운트되므로, 토스트는 useEffect가 아니라 여기서 즉시 띄운다.
+  const [state, formAction, pending] = useActionState(
+    async (prev: Result<null> | null, formData: FormData) => {
+      const r = await approveOccurrenceEdited(prev, formData);
+      if (r.ok) {
+        toast.success("승인했어요");
+        onDone();
+      }
+      return r;
+    },
+    null,
+  );
+  const [type, setType] = useState<TxType>(occ.type);
+
+  const fe = state && !state.ok ? state.fields : undefined;
+
+  return (
+    <form
+      action={formAction}
+      className="flex flex-col gap-3 rounded-lg border p-3 duration-200 animate-in fade-in-0 slide-in-from-top-1"
+    >
+      <input type="hidden" name="occId" value={occ.id} />
+      <input type="hidden" name="type" value={type} />
+
+      <ToggleGroup
+        type="single"
+        value={type}
+        onValueChange={(v) => v && setType(v as TxType)}
+        variant="outline"
+        spacing={0}
+        className="w-full"
+      >
+        <ToggleGroupItem
+          value="expense"
+          className="flex-1 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+        >
+          지출
+        </ToggleGroupItem>
+        <ToggleGroupItem
+          value="income"
+          className="flex-1 data-[state=on]:bg-emerald-600 data-[state=on]:text-white"
+        >
+          수입
+        </ToggleGroupItem>
+      </ToggleGroup>
+
+      <AmountInput
+        name="amount"
+        defaultValue={String(occ.amount)}
+        placeholder="금액"
+        required
+      />
+      {fe?.amount && <p className="text-sm text-destructive">{fe.amount}</p>}
+      <Input name="name" defaultValue={occ.name} placeholder="항목명" maxLength={100} required />
+      {fe?.name && <p className="text-sm text-destructive">{fe.name}</p>}
+
+      <FormSelect
+        name="categoryId"
+        ariaLabel="카테고리"
+        defaultValue={occ.categoryId ?? ""}
+        emptyLabel="미분류"
+        options={categories.map((c) => ({ value: c.id, label: c.name }))}
+      />
+      <FormSelect
+        name="paymentMethodId"
+        ariaLabel="결제수단"
+        defaultValue={occ.paymentMethodId ?? ""}
+        emptyLabel="없음"
+        options={payments.map((p) => ({ value: p.id, label: p.name }))}
+      />
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={`occAt-${occ.id}`}>발생일시</Label>
+        <Input
+          id={`occAt-${occ.id}`}
+          type="datetime-local"
+          name="occurredAt"
+          defaultValue={toKstInputValue(new Date(occ.occurredAt))}
+          required
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={`memo-${occ.id}`}>메모 (선택)</Label>
+        <Input id={`memo-${occ.id}`} name="memo" maxLength={500} />
+      </div>
+
+      {state && !state.ok && !state.fields && (
+        <p className="text-sm text-destructive">{state.error}</p>
+      )}
+
+      <div className="flex gap-2">
+        <Button type="submit" className="flex-1" disabled={pending}>
+          승인
+        </Button>
+        <Button type="button" variant="outline" onClick={onDone}>
+          취소
+        </Button>
+      </div>
+    </form>
   );
 }
 

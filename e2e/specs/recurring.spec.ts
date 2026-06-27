@@ -41,12 +41,41 @@ test.describe("정기 거래", () => {
     });
 
     await page.goto("/recurring");
-    await page.getByRole("button", { name: "승인" }).click();
+    await page.getByRole("button", { name: "승인", exact: true }).click();
     await expect(page.getByText("승인했어요")).toBeVisible();
 
     await expect.poll(async () => (await getOccurrence(appUser.uid, occId))?.status).toBe("approved");
     const tx = await findTransaction(appUser.uid, (t) => t.source === "recurring");
     expect(tx?.amount).toBe(500000);
+  });
+
+  test("대기 회차를 수정 후 승인하면 변경된 값으로 거래가 생성된다", async ({ page, appUser }) => {
+    const defId = await seedRecurringDef(appUser.uid, {
+      name: "전기요금",
+      amount: 30000,
+      freq: "monthly",
+      day: 15,
+      mode: "notify",
+      expiry: "hold",
+    });
+    const occId = await seedOccurrence(appUser.uid, {
+      defId,
+      occurredAt: TWO_DAYS_AGO(),
+      name: "전기요금",
+      amount: 30000,
+      type: "expense",
+    });
+
+    await page.goto("/recurring");
+    await page.getByRole("button", { name: "수정 후 승인" }).click();
+    await page.getByPlaceholder("금액").fill("42500");
+    await page.getByRole("button", { name: "승인", exact: true }).click();
+    await expect(page.getByText("승인했어요")).toBeVisible();
+
+    await expect.poll(async () => (await getOccurrence(appUser.uid, occId))?.status).toBe("approved");
+    const tx = await findTransaction(appUser.uid, (t) => t.source === "recurring");
+    expect(tx?.amount).toBe(42500);
+    expect(tx?.name).toBe("전기요금");
   });
 
   test("대기 회차를 해제하면 상태가 skipped가 된다", async ({ page, appUser }) => {
@@ -155,7 +184,7 @@ test.describe("정기 거래", () => {
     });
 
     await page.goto("/recurring");
-    await page.getByRole("button", { name: "수정" }).click();
+    await page.getByRole("button", { name: "수정", exact: true }).click();
     await expect(page.getByText("대기 회차는 그대로 남아요")).toHaveCount(0);
     await page.getByLabel("일").fill("20");
     await expect(page.getByText("대기 회차는 그대로 남아요")).toBeVisible();

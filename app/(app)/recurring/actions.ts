@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth/guard";
 import * as recRepo from "@/lib/recurring/repo";
 import { reconcile } from "@/lib/recurring/reconcile";
-import { recurringInput } from "@/lib/validation/domain";
+import { recurringInput, txInput } from "@/lib/validation/domain";
 import { fieldErrors } from "@/lib/validation/form";
 import { fail, ok, type Result } from "@/lib/server/result";
+import { fromKstInputValue } from "@/lib/kst";
 import type { DefInput } from "@/lib/recurring/repo";
 
 type State = Result<null> | null;
@@ -86,6 +87,39 @@ export async function approveOccurrence(formData: FormData): Promise<void> {
   await recRepo.approveOccurrence(u, id);
   revalidatePath(PATH);
   revalidatePath("/history");
+}
+
+export async function approveOccurrenceEdited(
+  _prev: State,
+  formData: FormData,
+): Promise<Result<null>> {
+  const u = await uid();
+  if (!u) return fail("로그인이 필요해요.");
+  const occId = String(formData.get("occId") ?? "");
+  if (!occId) return fail("잘못된 요청이에요.");
+  const parsed = txInput.safeParse({
+    name: formData.get("name"),
+    amount: formData.get("amount"),
+    type: formData.get("type"),
+    categoryId: formData.get("categoryId"),
+    paymentMethodId: formData.get("paymentMethodId"),
+    occurredAt: formData.get("occurredAt"),
+    memo: formData.get("memo"),
+  });
+  if (!parsed.success) return fail("입력을 확인해주세요.", fieldErrors(parsed.error));
+  const d = parsed.data;
+  await recRepo.approveOccurrenceWith(u, occId, {
+    name: d.name,
+    amount: d.amount,
+    type: d.type,
+    categoryId: d.categoryId,
+    paymentMethodId: d.paymentMethodId,
+    occurredAt: fromKstInputValue(d.occurredAt),
+    memo: d.memo,
+  });
+  revalidatePath(PATH);
+  revalidatePath("/history");
+  return ok(null);
 }
 
 export async function skipOccurrence(formData: FormData): Promise<void> {

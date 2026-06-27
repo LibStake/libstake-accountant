@@ -13,6 +13,7 @@ import type {
   RecurringDef,
   TxType,
 } from "@/lib/domain/types";
+import type { TxData } from "@/lib/domain/repo";
 
 const USERS = "users";
 const RECURRING = "recurring";
@@ -150,6 +151,27 @@ export async function approveOccurrence(uid: string, occId: string): Promise<voi
       paymentMethodId: occ.get("paymentMethodId") ?? null,
       occurredAt: occ.get("occurredAt"),
       memo: null,
+      source: "recurring",
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    tx.update(occRef, { status: "approved", txId: txRef.id });
+  });
+}
+
+// 수정 후 승인 → 회차 스냅샷 대신 넘겨받은 값으로 거래를 만들고 상태를 바꾼다(원자적). 이미 처리된 회차면 무시.
+export async function approveOccurrenceWith(
+  uid: string,
+  occId: string,
+  data: TxData,
+): Promise<void> {
+  const occRef = occCol(uid).doc(occId);
+  const txRef = userDoc(uid).collection(TRANSACTIONS).doc();
+  await db().runTransaction(async (tx) => {
+    const occ = await tx.get(occRef);
+    if (!occ.exists || occ.get("status") !== "pending") return;
+    tx.set(txRef, {
+      ...data,
+      occurredAt: Timestamp.fromDate(data.occurredAt),
       source: "recurring",
       createdAt: FieldValue.serverTimestamp(),
     });
