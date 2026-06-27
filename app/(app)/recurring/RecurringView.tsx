@@ -450,38 +450,33 @@ function PendingRow({
   }
 
   return (
-    <li className="flex items-center justify-between gap-2 rounded-lg border p-3">
-      <div className="min-w-0">
-        <p className="truncate text-sm font-medium">
-          {occ.name}{" "}
-          <span className={occ.type === "expense" ? "text-destructive" : ""}>
-            {occ.type === "income" ? "+" : "-"}
-            {won(occ.amount)}
-          </span>
-        </p>
-        <p className="text-xs text-muted-foreground">{formatKst(new Date(occ.occurredAt))}</p>
+    <li className="flex flex-col gap-1 rounded-lg border p-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="min-w-0 truncate font-medium">{occ.name}</span>
+        <span className={cn("shrink-0 tabular-nums", occ.type === "expense" && "text-destructive")}>
+          {occ.type === "income" ? "+" : "-"}
+          {won(occ.amount)}
+        </span>
       </div>
-      <div className="flex shrink-0 gap-1">
-        <form action={onApprove}>
-          <input type="hidden" name="occId" value={occ.id} />
-          <Button type="submit" variant="ghost" size="xs" className="text-emerald-600">
-            승인
+      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span className="truncate">{formatKst(new Date(occ.occurredAt))}</span>
+        <span className="flex shrink-0 items-center gap-1">
+          <form action={onApprove}>
+            <input type="hidden" name="occId" value={occ.id} />
+            <Button type="submit" variant="ghost" size="xs" className="text-emerald-600">
+              승인
+            </Button>
+          </form>
+          <Button type="button" variant="ghost" size="xs" onClick={() => setEditing(true)}>
+            수정 후 승인
           </Button>
-        </form>
-        <Button
-          type="button"
-          variant="ghost"
-          size="xs"
-          onClick={() => setEditing(true)}
-        >
-          수정 후 승인
-        </Button>
-        <form action={onSkip}>
-          <input type="hidden" name="occId" value={occ.id} />
-          <Button type="submit" variant="ghost" size="xs" className="text-muted-foreground">
-            해제
-          </Button>
-        </form>
+          <form action={onSkip}>
+            <input type="hidden" name="occId" value={occ.id} />
+            <Button type="submit" variant="ghost" size="xs" className="text-muted-foreground">
+              해제
+            </Button>
+          </form>
+        </span>
       </div>
     </li>
   );
