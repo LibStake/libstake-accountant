@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense, use } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LifeBuoy, PencilLine, PieChart, ReceiptText, Repeat, Settings } from "lucide-react";
@@ -35,7 +36,33 @@ function CountBadge({ n, className }: { n: number; className?: string }) {
   );
 }
 
-export function TopNav({ pendingCount }: { pendingCount: number }) {
+// 대기 수 promise가 풀리면 배지를 채운다. 풀리기 전엔 fallback(null)로 셸을 막지 않는다.
+function PendingBadge({
+  promise,
+  className,
+}: {
+  promise: Promise<number>;
+  className?: string;
+}) {
+  return (
+    <Suspense fallback={null}>
+      <ResolvedBadge promise={promise} className={className} />
+    </Suspense>
+  );
+}
+
+function ResolvedBadge({
+  promise,
+  className,
+}: {
+  promise: Promise<number>;
+  className?: string;
+}) {
+  const n = use(promise);
+  return n > 0 ? <CountBadge n={n} className={className} /> : null;
+}
+
+export function TopNav({ pendingCount }: { pendingCount: Promise<number> }) {
   const pathname = usePathname();
   return (
     <header className="hidden items-center gap-6 border-b px-4 py-3 sm:flex">
@@ -53,8 +80,8 @@ export function TopNav({ pendingCount }: { pendingCount: number }) {
             )}
           >
             {t.label}
-            {t.href === "/recurring" && pendingCount > 0 && (
-              <CountBadge n={pendingCount} className="ml-1" />
+            {t.href === "/recurring" && (
+              <PendingBadge promise={pendingCount} className="ml-1" />
             )}
           </Link>
         ))}
@@ -63,7 +90,7 @@ export function TopNav({ pendingCount }: { pendingCount: number }) {
   );
 }
 
-export function BottomNav({ pendingCount }: { pendingCount: number }) {
+export function BottomNav({ pendingCount }: { pendingCount: Promise<number> }) {
   const pathname = usePathname();
   return (
     <nav className="fixed inset-x-0 bottom-0 z-10 grid grid-cols-6 border-t bg-background pb-[env(safe-area-inset-bottom)] sm:hidden">
@@ -81,8 +108,8 @@ export function BottomNav({ pendingCount }: { pendingCount: number }) {
           >
             <span className="relative">
               <Icon className="size-5" />
-              {t.href === "/recurring" && pendingCount > 0 && (
-                <CountBadge n={pendingCount} className="absolute -top-1.5 -right-2.5" />
+              {t.href === "/recurring" && (
+                <PendingBadge promise={pendingCount} className="absolute -top-1.5 -right-2.5" />
               )}
             </span>
             {t.label}

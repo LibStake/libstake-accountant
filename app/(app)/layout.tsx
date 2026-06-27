@@ -1,5 +1,5 @@
 import { requireSession } from "@/lib/auth/guard";
-import { reconcile } from "@/lib/recurring/reconcile";
+import { reconcileOnce } from "@/lib/recurring/reconcile";
 import { countPending } from "@/lib/recurring/repo";
 import { BottomNav, TopNav } from "./AppNav";
 
@@ -9,8 +9,10 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const { uid } = await requireSession();
-  await reconcile(uid);
-  const pendingCount = await countPending(uid);
+  // 셸은 즉시 그리고, 재조정 후 대기 수를 읽어 정확한 배지를 배경에서 흘려보낸다(첫 페인트 비차단).
+  const pendingCount = reconcileOnce(uid)
+    .then(() => countPending(uid))
+    .catch(() => 0);
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
       <TopNav pendingCount={pendingCount} />

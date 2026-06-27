@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import {
   FieldValue,
   Timestamp,
@@ -39,6 +40,16 @@ export async function reconcile(uid: string, force = false): Promise<void> {
   }
   await userRef.update({ lastReconciledAt: Timestamp.fromDate(now) });
 }
+
+// 한 요청 안에서 재조정을 한 번만 수행한다(레이아웃·페이지가 공유).
+// ! - 실패해도 throw하지 않는다 — 후속 읽기(대기 수·최근 입력)는 재조정 전 상태로 진행되고, 다음 진입에서 재시도된다.
+export const reconcileOnce = cache(async (uid: string): Promise<void> => {
+  try {
+    await reconcile(uid);
+  } catch (e) {
+    console.error("recurring reconcile failed", e);
+  }
+});
 
 async function reconcileDef(
   uid: string,

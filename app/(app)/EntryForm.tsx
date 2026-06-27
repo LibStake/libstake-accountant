@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { Suspense, use, useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ import type { TxType } from "@/lib/domain/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   ToggleGroup,
   ToggleGroupItem,
@@ -19,17 +20,18 @@ import { createTransaction } from "./actions";
 
 type Opt = { id: string; name: string };
 type Recent = { id: string; name: string; amount: number; type: TxType };
-
-export function EntryForm({
-  categories,
-  payments,
-  defaultPaymentId,
-  recent,
-}: {
+type FormOptions = {
   categories: Opt[];
   payments: Opt[];
   defaultPaymentId: string | null;
-  recent: Recent[];
+};
+
+export function EntryForm({
+  form,
+  recent,
+}: {
+  form: Promise<FormOptions>;
+  recent: Promise<Recent[]>;
 }) {
   const router = useRouter();
   const [type, setType] = useState<"expense" | "income">("expense");
@@ -122,25 +124,16 @@ export function EntryForm({
 
         <div className="flex flex-col gap-1.5">
           <Label>카테고리</Label>
-          <FormSelect
-            key={`cat-${resetKey}`}
-            name="categoryId"
-            ariaLabel="카테고리"
-            emptyLabel="미분류"
-            options={categories.map((c) => ({ value: c.id, label: c.name }))}
-          />
+          <Suspense fallback={<Skeleton className="h-9 w-full" />}>
+            <CategoryField data={form} resetKey={resetKey} />
+          </Suspense>
         </div>
 
         <div className="flex flex-col gap-1.5">
           <Label>결제수단</Label>
-          <FormSelect
-            key={`pay-${resetKey}`}
-            name="paymentMethodId"
-            ariaLabel="결제수단"
-            defaultValue={defaultPaymentId ?? ""}
-            emptyLabel="없음"
-            options={payments.map((p) => ({ value: p.id, label: p.name }))}
-          />
+          <Suspense fallback={<Skeleton className="h-9 w-full" />}>
+            <PaymentField data={form} resetKey={resetKey} />
+          </Suspense>
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -166,30 +159,9 @@ export function EntryForm({
           />
         </div>
 
-        {recent.length > 0 && (
-          <div className="mt-2 flex flex-col gap-2 border-t pt-3">
-            <p className="text-xs text-muted-foreground">최근 입력</p>
-            <ul className="flex flex-col gap-1">
-              {recent.map((t) => (
-                <li
-                  key={t.id}
-                  className="flex items-baseline justify-between gap-2 text-sm"
-                >
-                  <span className="min-w-0 truncate text-muted-foreground">{t.name}</span>
-                  <span
-                    className={cn(
-                      "shrink-0 tabular-nums",
-                      t.type === "expense" ? "text-destructive" : "text-foreground",
-                    )}
-                  >
-                    {t.type === "income" ? "+" : "-"}
-                    {t.amount.toLocaleString("ko-KR")}원
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <Suspense fallback={null}>
+          <RecentList data={recent} />
+        </Suspense>
 
         {state && !state.ok && !state.fields && (
           <p className="text-sm text-destructive">{state.error}</p>
@@ -202,5 +174,73 @@ export function EntryForm({
         </Button>
       </div>
     </form>
+  );
+}
+
+function CategoryField({
+  data,
+  resetKey,
+}: {
+  data: Promise<FormOptions>;
+  resetKey: number;
+}) {
+  const { categories } = use(data);
+  return (
+    <FormSelect
+      key={`cat-${resetKey}`}
+      name="categoryId"
+      ariaLabel="카테고리"
+      emptyLabel="미분류"
+      options={categories.map((c) => ({ value: c.id, label: c.name }))}
+    />
+  );
+}
+
+function PaymentField({
+  data,
+  resetKey,
+}: {
+  data: Promise<FormOptions>;
+  resetKey: number;
+}) {
+  const { payments, defaultPaymentId } = use(data);
+  return (
+    <FormSelect
+      key={`pay-${resetKey}`}
+      name="paymentMethodId"
+      ariaLabel="결제수단"
+      defaultValue={defaultPaymentId ?? ""}
+      emptyLabel="없음"
+      options={payments.map((p) => ({ value: p.id, label: p.name }))}
+    />
+  );
+}
+
+function RecentList({ data }: { data: Promise<Recent[]> }) {
+  const recent = use(data);
+  if (recent.length === 0) return null;
+  return (
+    <div className="mt-2 flex flex-col gap-2 border-t pt-3">
+      <p className="text-xs text-muted-foreground">최근 입력</p>
+      <ul className="flex flex-col gap-1">
+        {recent.map((t) => (
+          <li
+            key={t.id}
+            className="flex items-baseline justify-between gap-2 text-sm"
+          >
+            <span className="min-w-0 truncate text-muted-foreground">{t.name}</span>
+            <span
+              className={cn(
+                "shrink-0 tabular-nums",
+                t.type === "expense" ? "text-destructive" : "text-foreground",
+              )}
+            >
+              {t.type === "income" ? "+" : "-"}
+              {t.amount.toLocaleString("ko-KR")}원
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
